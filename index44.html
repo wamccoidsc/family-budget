@@ -1,0 +1,2750 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ledger — Family Budget</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --ink:#20241f;
+    --paper:#f6f4ee;
+    --panel:#ffffff;
+    --line:#dcd6c8;
+    --forest:#1f3a34;
+    --forest-dim:#345048;
+    --gold:#b8935f;
+    --gold-dim:#e4d3b6;
+    --red:#a8452f;
+    --red-dim:#f3ddd6;
+    --green-pos:#2f6b4f;
+    --muted:#6b6558;
+    --radius:4px;
+    font-size:16px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Inter',system-ui,-apple-system,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3{font-family:'Source Serif 4',Georgia,serif;font-weight:600;margin:0;}
+  button{font-family:inherit;cursor:pointer;}
+  input,select{font-family:inherit;}
+
+  /* ---------- Auth screen ---------- */
+  #authScreen{
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:24px;
+  }
+  .auth-card{
+    width:100%;
+    max-width:380px;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:36px 32px;
+  }
+  .auth-card .mark{
+    font-family:'Source Serif 4',serif;
+    font-size:14px;
+    letter-spacing:0.04em;
+    color:var(--gold);
+    margin-bottom:6px;
+  }
+  .auth-card h1{font-size:28px;margin-bottom:4px;}
+  .auth-card p.sub{color:var(--muted);font-size:14px;margin:0 0 24px;}
+  .field{margin-bottom:14px;}
+  .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px;}
+  .field input, .field select{
+    width:100%;
+    padding:10px 11px;
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    background:#fdfcf9;
+    font-size:14px;
+    color:var(--ink);
+  }
+  .field input:focus, .field select:focus{outline:2px solid var(--forest);outline-offset:1px;}
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:6px;
+    padding:10px 16px;
+    border-radius:var(--radius);
+    border:1px solid transparent;
+    font-size:14px;font-weight:600;
+    transition:background .12s ease;
+  }
+  .btn-primary{background:var(--forest);color:#fff;width:100%;}
+  .btn-primary:hover{background:var(--forest-dim);}
+  .btn-ghost{background:transparent;border-color:var(--line);color:var(--ink);}
+  .btn-ghost:hover{background:#efece2;}
+  .btn-text{background:none;border:none;color:var(--forest);font-weight:600;padding:0;text-decoration:underline;font-size:13px;}
+  .auth-toggle{margin-top:16px;font-size:13px;color:var(--muted);text-align:center;}
+  .auth-error{background:var(--red-dim);color:var(--red);border-radius:var(--radius);padding:8px 10px;font-size:13px;margin-bottom:14px;display:none;}
+
+  /* ---------- App shell ---------- */
+  #appScreen{display:none;min-height:100vh;}
+  .shell{display:flex;min-height:100vh;}
+  .sidebar{
+    width:220px;flex-shrink:0;
+    background:var(--forest);
+    color:#eef2ef;
+    padding:26px 18px;
+    display:flex;flex-direction:column;
+  }
+  .brand{font-family:'Source Serif 4',serif;font-size:20px;color:#fff;margin-bottom:2px;}
+  .brand-sub{font-size:11px;color:var(--gold-dim);letter-spacing:.03em;margin-bottom:30px;}
+  .nav-item{
+    display:flex;align-items:center;gap:9px;
+    padding:9px 10px;border-radius:var(--radius);
+    color:#d7ded9;font-size:14px;font-weight:500;
+    margin-bottom:4px;
+    background:transparent;border:none;width:100%;text-align:left;
+  }
+  .nav-item:hover{background:rgba(255,255,255,0.06);}
+  .nav-item.active{background:rgba(255,255,255,0.14);color:#fff;}
+  .sidebar-foot{margin-top:auto;padding-top:16px;border-top:1px solid rgba(255,255,255,0.14);}
+  .userline{font-size:12px;color:var(--gold-dim);margin-bottom:10px;word-break:break-all;}
+  .signout{font-size:13px;color:#d7ded9;background:none;border:none;padding:0;text-decoration:underline;}
+
+  .main{flex:1;padding:30px 40px 60px;max-width:1180px;}
+  .topbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-bottom:26px;}
+  .month-switch{display:flex;align-items:center;gap:10px;}
+  .month-switch button{background:none;border:1px solid var(--line);border-radius:var(--radius);width:30px;height:30px;font-size:15px;color:var(--forest);}
+  .month-switch button:hover{background:#efece2;}
+  .month-label{font-family:'Source Serif 4',serif;font-size:22px;min-width:190px;text-align:center;}
+
+  .account-filter{display:flex;gap:6px;flex-wrap:wrap;}
+  .acct-pill{
+    background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    padding:6px 13px;font-size:13px;color:var(--muted);font-weight:500;
+  }
+  .acct-pill:hover{background:#efece2;}
+  .acct-pill.active{background:var(--forest);border-color:var(--forest);color:#fff;}
+
+  .summary-row{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:28px;}
+  .sum-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;}
+  .sum-card .lbl{font-size:12px;color:var(--muted);margin-bottom:6px;}
+  .sum-card .val{font-family:'Source Serif 4',serif;font-size:24px;}
+  .sum-card.pos .val{color:var(--green-pos);}
+  .sum-card.neg .val{color:var(--red);}
+
+  /* ---------- List view ---------- */
+  .section-block{margin-bottom:26px;}
+  .section-head{display:flex;align-items:baseline;justify-content:space-between;border-bottom:2px solid var(--ink);padding-bottom:6px;margin-bottom:10px;}
+  .section-head h3{font-size:15px;text-transform:none;letter-spacing:.01em;}
+  .section-head .sec-total{font-size:14px;color:var(--muted);font-family:'Source Serif 4',serif;}
+  .add-section-btn{
+    background:none;border:1px solid var(--line);border-radius:14px;
+    padding:4px 12px;font-size:12px;font-weight:600;color:var(--forest);
+  }
+  .add-section-btn:hover{background:var(--gold-dim);}
+  .item-row{
+    display:grid;
+    grid-template-columns:22px 1.3fr 1fr 1fr var(--tag-col-width, 128px) 100px 110px 90px 34px 34px;
+    align-items:center;gap:10px;
+    padding:10px 6px;
+    border-bottom:1px solid var(--line);
+    font-size:14px;
+  }
+  .item-row:last-child{border-bottom:none;}
+  .list-col-header{
+    border-bottom:none;padding:0 6px 4px;
+    font-size:11px;color:var(--muted);
+  }
+  .item-row .who-tag{
+    font-size:11px;font-weight:600;color:var(--forest);background:var(--gold-dim);
+    padding:2px 7px;border-radius:10px;display:inline-block;width:fit-content;
+  }
+  .item-desc{color:var(--ink);}
+  .item-desc .cat-note{display:block;font-size:11px;color:var(--muted);}
+  .tag-badge{
+    display:inline-block;margin-top:4px;font-size:10.5px;font-weight:600;color:var(--gold);
+    background:#fbf3e6;border:1px solid var(--gold-dim);padding:1px 8px;border-radius:9px;
+  }
+  .item-tag-select{
+    font-size:12px;padding:5px 6px;border:1px solid var(--line);border-radius:4px;
+    background:#fdfcf9;color:var(--ink);width:100%;max-width:100%;
+  }
+  .item-note{font-size:12px;color:var(--muted);font-style:italic;white-space:normal;word-break:break-word;line-height:1.35;}
+  .item-amt{font-family:'Source Serif 4',serif;font-size:15px;text-align:right;}
+  .item-amt-wrap{display:flex;flex-direction:column;align-items:flex-end;gap:2px;}
+  .item-balance{font-size:11px;color:var(--muted);}
+  .item-balance.negative{color:var(--red);}
+
+  .item-row-flat{grid-template-columns:20px 22px 1.1fr 110px 1fr 1fr var(--tag-col-width, 128px) 100px 110px 90px 34px 34px;}
+  .drag-handle{cursor:grab;color:var(--muted);font-size:14px;user-select:none;text-align:center;}
+  .drag-handle:active{cursor:grabbing;}
+  .item-row-flat.dragging{opacity:0.4;}
+  .sb-row{background:#faf5ea;}
+  .item-row-flat.drag-over-top{border-top:2px solid var(--forest);}
+  .item-row-flat.drag-over-bottom{border-bottom:2px solid var(--forest);}
+  .cat-tag{
+    font-size:11px;font-weight:600;color:#fff;background:var(--forest);
+    padding:2px 7px;border-radius:10px;display:inline-block;width:fit-content;
+  }
+  .item-amt.income{color:var(--green-pos);}
+  .item-due{color:var(--muted);font-size:13px;}
+  .post-check{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);}
+  .post-check input{width:15px;height:15px;accent-color:var(--forest);}
+  .row-del{background:none;border:none;color:var(--muted);font-size:16px;line-height:1;}
+  .row-dup{background:none;border:none;color:var(--muted);font-size:15px;line-height:1;}
+  .row-dup:hover{color:var(--forest);}
+  .row-del:hover{color:var(--red);}
+  .empty-note{color:var(--muted);font-size:13px;padding:14px 6px;}
+
+  .acct-row{
+    display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:14px;
+    padding:12px 6px;border-bottom:1px solid var(--line);
+  }
+  .acct-row.bank-acct-row{grid-template-columns:1fr 130px 150px auto auto;}
+  .acct-row.tag-row{grid-template-columns:36px 1fr auto auto;}
+  .acct-row.tag-row input[type="color"]{
+    width:32px;height:32px;padding:0;border:1px solid var(--line);border-radius:4px;
+    background:none;cursor:pointer;
+  }
+  .acct-row:last-child{border-bottom:none;}
+  .acct-row input[type="text"]{
+    padding:8px 10px;border:1px solid var(--line);border-radius:4px;
+    background:#fdfcf9;font-size:14px;color:var(--ink);width:100%;max-width:280px;
+  }
+  .acct-row input[type="number"]{
+    padding:8px 10px;border:1px solid var(--line);border-radius:4px;
+    background:#fdfcf9;font-size:14px;color:var(--ink);width:100%;
+  }
+  .acct-row .acct-count{font-size:12px;color:var(--muted);white-space:nowrap;}
+  .acct-row .acct-del{background:none;border:none;color:var(--muted);font-size:13px;text-decoration:underline;white-space:nowrap;}
+  .acct-row .acct-del:hover{color:var(--red);}
+
+  .recur-account-group{margin-bottom:26px;}
+
+  /* ---------- Reports ---------- */
+  .report-filters{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:18px 20px;}
+  .report-filter-row{display:flex;gap:28px;flex-wrap:wrap;margin-bottom:16px;}
+  .report-filter-group{min-width:150px;}
+  .report-filter-group .rfg-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
+  .report-filter-group .rfg-title{font-size:12px;font-weight:600;color:var(--ink);}
+  .report-filter-group .rfg-toggle{font-size:11px;color:var(--forest);background:none;border:none;text-decoration:underline;}
+  .report-filter-group .rfg-options{max-height:140px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;}
+  .report-filter-group label{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--ink);}
+  .report-filter-group input[type="checkbox"]{width:14px;height:14px;accent-color:var(--forest);}
+  .report-export-btn{margin-left:auto;}
+  .report-charts{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-top:20px;}
+  .chart-panel{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:16px 18px;}
+  .chart-panel .chart-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+  .chart-panel h4{font-size:14px;font-family:'Source Serif 4',serif;}
+  .chart-panel select{font-size:12px;padding:4px 8px;border:1px solid var(--line);border-radius:4px;background:#fdfcf9;}
+  .pie-type-filter{position:relative;font-size:12px;}
+  .pie-type-filter summary{
+    list-style:none;cursor:pointer;padding:4px 10px;border:1px solid var(--line);border-radius:4px;
+    background:#fdfcf9;color:var(--ink);
+  }
+  .pie-type-filter summary::-webkit-details-marker{display:none;}
+  .pie-type-filter[open] summary{border-color:var(--forest);}
+  .pie-type-filter-options{
+    position:absolute;top:calc(100% + 4px);left:0;z-index:20;
+    background:var(--panel);border:1px solid var(--line);border-radius:4px;
+    padding:10px 12px;box-shadow:0 4px 14px rgba(0,0,0,0.12);
+    display:flex;flex-direction:column;gap:5px;min-width:170px;max-height:220px;overflow-y:auto;
+  }
+  .pie-type-filter-options label{display:flex;align-items:center;gap:6px;font-size:12px;white-space:nowrap;}
+  .pie-type-filter-options input{width:13px;height:13px;accent-color:var(--forest);}
+  .chart-legend{display:flex;flex-direction:column;gap:5px;margin-top:10px;font-size:12px;}
+  .chart-legend-row{display:flex;align-items:center;gap:8px;}
+  .chart-legend-swatch{width:10px;height:10px;border-radius:2px;flex-shrink:0;}
+  .chart-legend-label{flex:1;color:var(--ink);}
+  .chart-legend-val{color:var(--muted);font-family:'Source Serif 4',serif;}
+  .report-table-row{
+    display:grid;grid-template-columns:90px 1fr 100px 110px 120px 100px;
+    gap:10px;padding:8px 6px;border-bottom:1px solid var(--line);font-size:13px;align-items:center;
+  }
+  .report-table-row:last-child{border-bottom:none;}
+  .report-table-row .rt-amt{font-family:'Source Serif 4',serif;text-align:right;}
+  .report-table-row .rt-amt.income{color:var(--green-pos);}
+  .recur-account-group h3{font-size:15px;border-bottom:2px solid var(--ink);padding-bottom:6px;margin-bottom:4px;}
+  .recur-row{
+    display:grid;grid-template-columns:1fr 110px 90px 1fr auto auto;align-items:center;gap:14px;
+    padding:12px 6px;border-bottom:1px solid var(--line);font-size:14px;
+  }
+  .recur-row:last-child{border-bottom:none;}
+  .recur-row .recur-desc{color:var(--ink);}
+  .recur-row .recur-desc .recur-sub{display:block;font-size:11px;color:var(--muted);}
+  .recur-row .cat-tag{font-size:10.5px;}
+  .recur-row .recur-amt{font-family:'Source Serif 4',serif;text-align:right;}
+  .recur-row .recur-sched{font-size:12px;color:var(--muted);}
+  .recur-row .recur-edit{background:none;border:none;color:var(--forest);font-size:13px;text-decoration:underline;white-space:nowrap;}
+  .recur-row .recur-del{background:none;border:none;color:var(--muted);font-size:13px;text-decoration:underline;white-space:nowrap;}
+  .recur-row .recur-del:hover{color:var(--red);}
+
+  /* ---------- Calendar view ---------- */
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;}
+  .cal-carryover-note{font-size:13px;color:var(--muted);margin-bottom:14px;}
+  .cal-carryover-note.negative{color:var(--red);}
+  .cal-dow{font-size:11px;color:var(--muted);text-align:center;padding-bottom:4px;letter-spacing:.03em;}
+  .cal-cell{
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    min-height:112px;padding:7px 8px;position:relative;display:flex;flex-direction:column;
+  }
+  .cal-cell.blank{background:transparent;border:none;}
+  .cal-daynum{font-family:'Source Serif 4',serif;font-size:14px;color:var(--ink);}
+  .cal-daynum.today{color:var(--forest);font-weight:700;text-decoration:underline;}
+  .cal-out{font-size:12px;color:var(--red);margin-top:4px;}
+  .cal-left{font-size:11px;color:var(--muted);margin-top:auto;padding-top:4px;}
+  .cal-left b{color:var(--ink);}
+  .cal-items{margin-top:4px;display:flex;flex-direction:column;gap:2px;overflow:hidden;}
+  .cal-item-chip{
+    font-size:10.5px;line-height:1.3;padding:2px 5px;border-radius:3px;
+    background:var(--gold-dim);color:var(--forest);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    border:none;text-align:left;width:100%;font-family:inherit;
+  }
+  .cal-item-chip.income{background:#dcebe1;color:var(--green-pos);}
+  .cal-item-chip.posted{opacity:0.55;text-decoration:line-through;}
+  .cal-item-chip:hover{filter:brightness(0.95);}
+
+  /* ---------- Modal ---------- */
+  .overlay{
+    display:none;position:fixed;inset:0;background:rgba(32,36,31,0.45);
+    align-items:center;justify-content:center;z-index:50;padding:20px;
+  }
+  .modal{
+    background:var(--panel);border-radius:var(--radius);
+    width:100%;max-width:420px;padding:28px;
+    max-height:90vh;overflow-y:auto;
+  }
+  .modal h2{font-size:19px;margin-bottom:18px;}
+  .field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px;}
+
+  .fab-group{position:fixed;bottom:30px;right:40px;display:flex;gap:12px;}
+  .fab{
+    background:var(--forest);color:#fff;border:none;border-radius:30px;
+    padding:13px 22px;font-size:14px;font-weight:600;
+    box-shadow:0 4px 14px rgba(0,0,0,0.18);
+  }
+  .fab:hover{background:var(--forest-dim);}
+  .fab-secondary{background:var(--panel);color:var(--forest);border:1px solid var(--line);}
+  .fab-secondary:hover{background:#efece2;}
+
+  @media (max-width:800px){
+    .shell{flex-direction:column;}
+    .sidebar{width:100%;flex-direction:row;align-items:center;padding:14px 18px;}
+    .brand-sub{display:none;}
+    .nav{display:flex;gap:4px;}
+    .sidebar-foot{margin-top:0;margin-left:auto;border:none;padding:0;}
+    .userline{display:none;}
+    .main{padding:20px 16px 80px;}
+    .summary-row{grid-template-columns:1fr 1fr;}
+    .item-row{grid-template-columns:1fr;gap:4px;padding:12px 4px;}
+    .item-row-flat{grid-template-columns:1fr;}
+    .item-row .post-check{justify-content:flex-start;}
+    .cal-grid{grid-template-columns:repeat(7,1fr);}
+    .cal-cell{min-height:64px;font-size:11px;padding:5px 4px;}
+    .cal-out,.cal-left{font-size:10px;}
+    .field-row{grid-template-columns:1fr;}
+    .report-charts{grid-template-columns:1fr;}
+    .report-table-row{grid-template-columns:1fr;gap:2px;padding:10px 4px;}
+    .report-filter-row{gap:18px;}
+  }
+</style>
+</head>
+<body>
+
+<!-- ================= AUTH SCREEN ================= -->
+<div id="authScreen">
+  <div class="auth-card">
+    <div class="mark">LEDGER</div>
+    <h1 id="authTitle">Sign in</h1>
+    <p class="sub" id="authSub">Track the family's money, together.</p>
+    <div class="auth-error" id="authError"></div>
+    <form id="authForm">
+      <div class="field">
+        <label for="authEmail">Email</label>
+        <input type="email" id="authEmail" required autocomplete="email">
+      </div>
+      <div class="field">
+        <label for="authPass">Password</label>
+        <input type="password" id="authPass" required autocomplete="current-password" minlength="6">
+      </div>
+      <button type="submit" class="btn btn-primary" id="authSubmitBtn">Sign in</button>
+    </form>
+    <div class="auth-toggle">
+      <span id="authToggleText">Don't have an account?</span>
+      <button class="btn-text" id="authToggleBtn" type="button">Create one</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= APP SCREEN ================= -->
+<div id="appScreen">
+  <div class="shell">
+    <div class="sidebar">
+      <div class="brand">Ledger</div>
+      <div class="brand-sub">Family Budget</div>
+      <div class="nav">
+        <button class="nav-item active" data-view="list">☰ &nbsp;List view</button>
+        <button class="nav-item" data-view="calendar">▦ &nbsp;Calendar view</button>
+        <button class="nav-item" data-view="manage">🏦 &nbsp;Manage accounts</button>
+        <button class="nav-item" data-view="recurring">🔁 &nbsp;Manage recurring</button>
+        <button class="nav-item" data-view="tags">🏷️ &nbsp;Manage tags</button>
+        <button class="nav-item" data-view="reports">📊 &nbsp;Reports</button>
+      </div>
+      <div class="sidebar-foot">
+        <div class="userline" id="userEmailLabel"></div>
+        <button class="signout" id="signOutBtn">Sign out</button>
+      </div>
+    </div>
+
+    <div class="main">
+      <div id="budgetChrome">
+        <div class="topbar">
+          <div class="month-switch">
+            <button id="prevMonth">‹</button>
+            <div class="month-label" id="monthLabel">—</div>
+            <button id="nextMonth">›</button>
+          </div>
+          <div class="account-filter" id="accountFilter"></div>
+        </div>
+
+        <div class="summary-row">
+          <div class="sum-card pos"><div class="lbl">Income this month</div><div class="val" id="sumIncome">$0</div></div>
+          <div class="sum-card neg"><div class="lbl">Going out this month</div><div class="val" id="sumOut">$0</div></div>
+          <div class="sum-card" id="sumNetCard"><div class="lbl">Net remaining</div><div class="val" id="sumNet">$0</div></div>
+          <div class="sum-card" id="sumPriorCard"><div class="lbl">Carried from prior months</div><div class="val" id="sumPrior">$0</div></div>
+          <div class="sum-card" id="sumGrandCard"><div class="lbl">Total net remaining</div><div class="val" id="sumGrand">$0</div></div>
+          <div class="sum-card"><div class="lbl">Items unverified</div><div class="val" id="sumUnverified">0</div></div>
+        </div>
+      </div>
+
+      <!-- LIST VIEW -->
+      <div id="listView"></div>
+
+      <!-- CALENDAR VIEW -->
+      <div id="calendarView" style="display:none;">
+        <div id="calCarryoverNote" class="cal-carryover-note"></div>
+        <div class="cal-grid" id="calGrid"></div>
+      </div>
+
+      <!-- MANAGE ACCOUNTS VIEW -->
+      <div id="manageView" style="display:none;">
+        <div class="section-block">
+          <div class="section-head">
+            <h3>Your bank accounts</h3>
+          </div>
+          <div id="manageAccountRows"></div>
+        </div>
+        <div class="auth-error" id="manageError" style="display:none;"></div>
+        <form id="newAccountForm" style="display:flex;gap:10px;max-width:420px;margin-top:18px;">
+          <input type="text" id="newAccountName" placeholder="e.g. Joint Checking" required
+                 style="flex:1;padding:10px 11px;border:1px solid var(--line);border-radius:4px;background:#fdfcf9;font-size:14px;">
+          <button type="submit" class="btn btn-primary" style="width:auto;white-space:nowrap;">+ Add account</button>
+        </form>
+      </div>
+
+      <!-- MANAGE RECURRING VIEW -->
+      <div id="recurringView" style="display:none;">
+        <div id="recurringGroups"></div>
+      </div>
+
+      <!-- MANAGE TAGS VIEW -->
+      <div id="tagsView" style="display:none;">
+        <div class="section-block">
+          <div class="section-head">
+            <h3>Your tags</h3>
+          </div>
+          <div id="manageTagRows"></div>
+        </div>
+        <div class="auth-error" id="tagManageError" style="display:none;"></div>
+        <form id="newTagForm" style="display:flex;gap:10px;max-width:420px;margin-top:18px;">
+          <input type="text" id="newTagName" placeholder="e.g. Insurance" required
+                 style="flex:1;padding:10px 11px;border:1px solid var(--line);border-radius:4px;background:#fdfcf9;font-size:14px;">
+          <button type="submit" class="btn btn-primary" style="width:auto;white-space:nowrap;">+ Add tag</button>
+        </form>
+      </div>
+
+      <!-- REPORTS VIEW -->
+      <div id="reportsView" style="display:none;">
+        <div class="report-filters" id="reportFilters"></div>
+        <div class="summary-row" id="reportSummaryRow" style="margin-top:20px;"></div>
+        <div class="report-charts" id="reportCharts"></div>
+        <div class="section-block" style="margin-top:26px;">
+          <div class="section-head">
+            <h3>Transactions</h3>
+            <span class="sec-total" id="reportRowCount"></span>
+          </div>
+          <div id="reportTable"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="fab-group">
+    <button class="fab fab-secondary" id="openTransferModal">⇄ Transfer</button>
+    <button class="fab" id="openAddModal">+ Add item</button>
+  </div>
+</div>
+
+<!-- ================= TRANSFER MODAL ================= -->
+<div class="overlay" id="transferOverlay">
+  <div class="modal">
+    <h2>Transfer between accounts</h2>
+    <div class="auth-error" id="transferError"></div>
+    <form id="transferForm">
+      <div class="field-row">
+        <div class="field">
+          <label for="transferFrom">From account</label>
+          <select id="transferFrom" required></select>
+        </div>
+        <div class="field">
+          <label for="transferTo">To account</label>
+          <select id="transferTo" required></select>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="transferAmount">Amount ($)</label>
+          <input type="text" inputmode="decimal" id="transferAmount" placeholder="0.00" required>
+        </div>
+        <div class="field">
+          <label for="transferDate">Date</label>
+          <input type="date" id="transferDate" required>
+        </div>
+      </div>
+      <div class="field">
+        <label for="transferNote">Note (optional)</label>
+        <textarea id="transferNote" rows="2" placeholder="e.g. Covering rent this month"
+                  style="width:100%;padding:10px 11px;border:1px solid var(--line);border-radius:4px;background:#fdfcf9;font-size:14px;color:var(--ink);font-family:inherit;resize:vertical;"></textarea>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="cancelTransferBtn">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="saveTransferBtn" style="width:auto;">Save transfer</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ================= ADD / EDIT MODAL ================= -->
+<div class="overlay" id="itemOverlay">
+  <div class="modal">
+    <h2 id="modalTitle">Add budget item</h2>
+    <div class="auth-error" id="itemError"></div>
+    <form id="itemForm">
+      <div class="field">
+        <label for="itemCategory">Category</label>
+        <select id="itemCategory" required>
+          <option value="income">Income</option>
+          <option value="subscription">Subscription</option>
+          <option value="monthly_bill">Monthly bill</option>
+          <option value="collections">Collections</option>
+          <option value="pay_in_4">Pay in 4</option>
+          <option value="one_time">One-time payment</option>
+          <optgroup label="Transfers (created via the Transfer button)">
+            <option value="transfer_out">Transfer Out</option>
+            <option value="transfer_in">Transfer In</option>
+          </optgroup>
+        </select>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="itemPerson">Who is it for</label>
+          <input type="text" id="itemPerson" list="peopleList" placeholder="e.g. Sam" required>
+          <datalist id="peopleList"></datalist>
+        </div>
+        <div class="field">
+          <label for="itemAmount">Amount ($)</label>
+          <input type="text" inputmode="decimal" id="itemAmount" placeholder="0.00" required>
+        </div>
+      </div>
+      <div class="field">
+        <label for="itemDesc">Description</label>
+        <input type="text" id="itemDesc" placeholder="e.g. Netflix, Electric bill, Paycheck">
+      </div>
+      <div class="field">
+        <label for="itemNote">Note (optional)</label>
+        <textarea id="itemNote" rows="2" placeholder="e.g. Autopay from checking, includes late fee"
+                  style="width:100%;padding:10px 11px;border:1px solid var(--line);border-radius:4px;background:#fdfcf9;font-size:14px;color:var(--ink);font-family:inherit;resize:vertical;"></textarea>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="itemAccount">Bank account</label>
+          <select id="itemAccount" required></select>
+        </div>
+        <div class="field" id="dueDateWrap">
+          <label for="itemDue">Due date</label>
+          <input type="date" id="itemDue" required>
+        </div>
+      </div>
+      <div class="field">
+        <label for="itemTag">Tag (optional)</label>
+        <select id="itemTag"></select>
+      </div>
+
+      <div class="field" id="recurringToggleWrap" style="display:none;">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink);">
+          <input type="checkbox" id="itemRecurring" style="width:16px;height:16px;accent-color:var(--forest);">
+          Repeats monthly
+        </label>
+      </div>
+
+      <div class="field" id="recurringFieldsLabel" style="display:none;font-size:12px;color:var(--muted);margin-bottom:6px;">
+        Series schedule — only used when you choose "Save entire series" below. The due date above applies to this occurrence only.
+      </div>
+      <div id="recurringFields" style="display:none;background:#faf8f2;border:1px solid var(--line);border-radius:4px;padding:14px;margin-bottom:14px;">
+        <div class="field">
+          <label>Frequency</label>
+          <div style="display:flex;align-items:center;gap:16px;font-size:13px;margin-top:6px;">
+            <label style="display:flex;align-items:center;gap:6px;">
+              <input type="radio" name="recurFrequency" value="monthly" checked> Monthly
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;">
+              <input type="radio" name="recurFrequency" value="biweekly"> Every 2 weeks
+            </label>
+          </div>
+        </div>
+        <div class="field" id="monthlyDayOptions">
+          <label>Repeats on</label>
+          <div style="display:flex;align-items:center;gap:16px;font-size:13px;margin-top:6px;">
+            <label style="display:flex;align-items:center;gap:6px;">
+              <input type="radio" name="dayOption" value="specific_date" checked>
+              Day
+              <input type="number" id="itemRecurDay" min="1" max="31" value="1"
+                     style="width:55px;padding:5px 6px;border:1px solid var(--line);border-radius:4px;">
+              of the month
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;">
+              <input type="radio" name="dayOption" value="last_business_day">
+              Last business day
+            </label>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="itemRecurStart">Start date</label>
+            <input type="date" id="itemRecurStart">
+          </div>
+          <div class="field">
+            <label for="itemRecurEnd">End date (optional)</label>
+            <input type="date" id="itemRecurEnd">
+          </div>
+        </div>
+        <div style="font-size:12px;color:var(--muted);" id="recurringHint">Leave end date blank to schedule up to 2 years out; you can always add more later.</div>
+      </div>
+
+      <div class="field" id="postedWrap">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink);">
+          <input type="checkbox" id="itemPosted" style="width:16px;height:16px;accent-color:var(--forest);">
+          Verified as posted
+        </label>
+      </div>
+      <input type="hidden" id="itemId">
+      <input type="hidden" id="itemRecurringRuleId">
+      <div id="seriesEditNote" style="display:none;font-size:12px;color:var(--muted);background:#faf8f2;border:1px solid var(--line);border-radius:4px;padding:8px 10px;margin-bottom:12px;">
+        This is part of a recurring series. "Save entire series" updates the person, description, note, amount, category, and account for every occurrence — the due date and posted status here only apply to this one.
+      </div>
+      <div class="modal-actions" style="justify-content:space-between;">
+        <button type="button" class="btn-text" id="deleteSeriesBtn" style="display:none;color:var(--red);">Delete entire series</button>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;">
+          <button type="button" class="btn btn-ghost" id="cancelItemBtn">Cancel</button>
+          <button type="button" class="btn btn-ghost" id="saveSingleBtn" style="width:auto;display:none;">Save this one</button>
+          <button type="button" class="btn btn-primary" id="saveSeriesBtn" style="width:auto;display:none;">Save entire series</button>
+          <button type="submit" class="btn btn-primary" id="saveItemBtn" style="width:auto;">Save item</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://pdlnkoqxkjdbwaasyxhx.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_wRn4biecUn0yP3YIqYdUeQ_KFWsrHe5';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const CATEGORY_LABELS = {
+  income: 'Income',
+  subscription: 'Subscriptions',
+  monthly_bill: 'Monthly Bills',
+  collections: 'Collections',
+  pay_in_4: 'Pay in 4',
+  one_time: 'One-Time Payments',
+  transfer_out: 'Transfer Out',
+  transfer_in: 'Transfer In'
+};
+const CATEGORY_ORDER = ['income','subscription','monthly_bill','collections','pay_in_4','one_time','transfer_out','transfer_in'];
+const RECURRING_CATEGORIES = ['income','subscription','monthly_bill','collections'];
+function isCredit(category) { return category === 'income' || category === 'transfer_in'; }
+
+let currentUser = null;
+let currentDate = new Date();
+currentDate.setDate(1);
+let items = [];
+let currentView = 'list';
+let isSignUpMode = false;
+let currentAccountFilter = 'all';
+let bankAccounts = []; // [{id, name}]
+
+const $ = (id) => document.getElementById(id);
+const fmtMoney = (n) => (n < 0 ? '-' : '') + '$' + Math.abs(n).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+
+// Live-formats a currency text input as the user types: strips anything
+// that isn't a digit or decimal point, caps two decimal places, and adds
+// thousands commas — so typing "1239.1" becomes "1,239.1" automatically.
+function formatCurrencyLive(e) {
+  const input = e.target;
+  const cleaned = input.value.replace(/[^\d.]/g, '');
+  const parts = cleaned.split('.');
+  let intPart = (parts[0] || '').replace(/^0+(?=\d)/, '');
+  const hasDot = parts.length > 1;
+  const decPart = hasDot ? parts.slice(1).join('').slice(0, 2) : null;
+  const withCommas = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  input.value = hasDot ? `${withCommas}.${decPart}` : withCommas;
+}
+function parseCurrencyInput(val) {
+  const n = parseFloat(String(val).replace(/,/g, ''));
+  return isNaN(n) ? 0 : n;
+}
+
+$('itemAmount').addEventListener('input', formatCurrencyLive);
+$('transferAmount').addEventListener('input', formatCurrencyLive);
+
+// ---------------- AUTH ----------------
+$('authToggleBtn').addEventListener('click', () => {
+  isSignUpMode = !isSignUpMode;
+  $('authTitle').textContent = isSignUpMode ? 'Create account' : 'Sign in';
+  $('authSubmitBtn').textContent = isSignUpMode ? 'Create account' : 'Sign in';
+  $('authToggleText').textContent = isSignUpMode ? 'Already have an account?' : "Don't have an account?";
+  $('authToggleBtn').textContent = isSignUpMode ? 'Sign in' : 'Create one';
+  $('authError').style.display = 'none';
+});
+
+$('authForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email = $('authEmail').value.trim();
+  const password = $('authPass').value;
+  $('authError').style.display = 'none';
+  $('authSubmitBtn').textContent = 'Working…';
+  try {
+    let result;
+    if (isSignUpMode) {
+      result = await sb.auth.signUp({ email, password });
+      if (!result.error && result.data.user && !result.data.session) {
+        showAuthError('Account created. Check your email to confirm, then sign in.', false);
+        isSignUpMode = false;
+        $('authTitle').textContent = 'Sign in';
+        $('authSubmitBtn').textContent = 'Sign in';
+        return;
+      }
+    } else {
+      result = await sb.auth.signInWithPassword({ email, password });
+    }
+    if (result.error) throw result.error;
+    if (result.data.session) await onAuthed(result.data.session.user);
+  } catch (err) {
+    showAuthError(err.message || 'Something went wrong.', true);
+  } finally {
+    $('authSubmitBtn').textContent = isSignUpMode ? 'Create account' : 'Sign in';
+  }
+});
+
+function showAuthError(msg, isError) {
+  const el = $('authError');
+  el.textContent = msg;
+  el.style.background = isError ? 'var(--red-dim)' : 'var(--gold-dim)';
+  el.style.color = isError ? 'var(--red)' : 'var(--forest)';
+  el.style.display = 'block';
+}
+
+$('signOutBtn').addEventListener('click', async () => {
+  await sb.auth.signOut();
+  currentUser = null;
+  items = [];
+  $('appScreen').style.display = 'none';
+  $('authScreen').style.display = 'flex';
+});
+
+async function onAuthed(user) {
+  currentUser = user;
+  $('userEmailLabel').textContent = user.email;
+  $('authScreen').style.display = 'none';
+  $('appScreen').style.display = 'block';
+  await loadAccounts();
+  await loadItems();
+  await loadRecurringRules();
+  await loadTags();
+  render();
+}
+
+// try to resume session on load
+(async () => {
+  const { data } = await sb.auth.getSession();
+  if (data.session) await onAuthed(data.session.user);
+})();
+
+// ---------------- DATA ----------------
+async function loadItems() {
+  const { data, error } = await sb
+    .from('budget_items')
+    .select('*')
+    .order('due_date', { ascending: true });
+  if (error) {
+    console.error(error);
+    alert('Could not load budget items: ' + error.message);
+    return;
+  }
+  items = data || [];
+  refreshPeopleList();
+}
+
+function refreshPeopleList() {
+  const names = [...new Set(items.map(i => i.person).filter(Boolean))];
+  $('peopleList').innerHTML = names.map(n => `<option value="${escapeHtml(n)}">`).join('');
+}
+
+async function loadAccounts() {
+  const { data, error } = await sb
+    .from('bank_accounts')
+    .select('*')
+    .order('name', { ascending: true });
+  if (error) {
+    console.error(error);
+    alert('Could not load bank accounts: ' + error.message);
+    return;
+  }
+  bankAccounts = data || [];
+  if (currentAccountFilter !== 'all' && !bankAccounts.find(a => a.id === currentAccountFilter)) {
+    currentAccountFilter = 'all';
+  }
+  renderAccountFilter();
+  populateAccountSelect();
+  renderManageAccounts();
+}
+
+function getAccountName(item) {
+  const acct = bankAccounts.find(a => a.id === item.account_id);
+  return acct ? acct.name : 'Unassigned';
+}
+
+let recurringRules = [];
+
+async function loadRecurringRules() {
+  const { data, error } = await sb
+    .from('recurring_rules')
+    .select('*')
+    .order('start_date', { ascending: true });
+  if (error) {
+    console.error(error);
+    return;
+  }
+  recurringRules = data || [];
+}
+
+function scheduleSummary(rule) {
+  const fmtDate = (d) => new Date(d + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  const range = `${fmtDate(rule.start_date)} – ${rule.end_date ? fmtDate(rule.end_date) : 'ongoing'}`;
+  if (rule.frequency === 'biweekly') return `Every 2 weeks · ${range}`;
+  const dayText = rule.day_option === 'last_business_day' ? 'last business day' : `day ${rule.day_of_month}`;
+  return `Monthly, ${dayText} · ${range}`;
+}
+
+function renderRecurringManage() {
+  const wrap = $('recurringGroups');
+  wrap.innerHTML = '';
+
+  if (recurringRules.length === 0) {
+    wrap.innerHTML = '<div class="empty-note">No recurring series yet. Create one from "+ Add item" by checking "Repeats monthly".</div>';
+    return;
+  }
+
+  const groups = { unassigned: [] };
+  bankAccounts.forEach(a => { groups[a.id] = []; });
+  recurringRules.forEach(rule => {
+    const key = rule.account_id && groups[rule.account_id] ? rule.account_id : 'unassigned';
+    groups[key].push(rule);
+  });
+
+  const orderedKeys = [...bankAccounts.map(a => a.id), 'unassigned'];
+  orderedKeys.forEach(key => {
+    const rules = groups[key];
+    if (!rules || rules.length === 0) return;
+    const accountName = key === 'unassigned' ? 'Unassigned' : bankAccounts.find(a => a.id === key).name;
+
+    const group = document.createElement('div');
+    group.className = 'recur-account-group';
+    group.innerHTML = `<h3>${escapeHtml(accountName)}</h3>`;
+    const rowsWrap = document.createElement('div');
+
+    rules.forEach(rule => {
+      const occCount = items.filter(i => i.recurring_rule_id === rule.id).length;
+      const row = document.createElement('div');
+      row.className = 'recur-row';
+      row.innerHTML = `
+        <div class="recur-desc">${escapeHtml(rule.description || CATEGORY_LABELS[rule.category])}
+          <span class="recur-sub">${escapeHtml(rule.person)} · ${occCount} occurrence${occCount === 1 ? '' : 's'}</span>
+          ${rule.tag_id && tags.find(t => t.id === rule.tag_id) ? `<span class="tag-badge" style="background:${getTagColorById(rule.tag_id)}22;border-color:${getTagColorById(rule.tag_id)};color:${getTagColorById(rule.tag_id)};">${escapeHtml(tags.find(t => t.id === rule.tag_id).name)}</span>` : ''}
+        </div>
+        <span class="cat-tag">${CATEGORY_LABELS[rule.category]}</span>
+        <div class="recur-amt ${isCredit(rule.category) ? 'income' : ''}">${isCredit(rule.category) ? '+' : '-'}${fmtMoney(Math.abs(rule.amount))}</div>
+        <div class="recur-sched">${scheduleSummary(rule)}</div>
+        <button class="recur-edit">Edit</button>
+        <button class="recur-del">Delete</button>
+      `;
+      row.querySelector('.recur-edit').addEventListener('click', () => openRuleModal(rule));
+      row.querySelector('.recur-del').addEventListener('click', async () => {
+        if (!confirm('Delete this entire recurring series? All past and future occurrences will be removed.')) return;
+        const { error } = await sb.from('recurring_rules').delete().eq('id', rule.id);
+        if (error) { alert('Could not delete series: ' + error.message); return; }
+        await loadItems();
+        await loadRecurringRules();
+        renderRecurringManage();
+      });
+      rowsWrap.appendChild(row);
+    });
+    group.appendChild(rowsWrap);
+    wrap.appendChild(group);
+  });
+}
+
+function openRuleModal(rule) {
+  $('itemError').style.display = 'none';
+  $('itemForm').reset();
+  $('itemId').value = '';
+  $('itemRecurring').checked = false;
+  $('itemRecurringRuleId').value = rule.id;
+  $('modalTitle').textContent = 'Edit recurring series';
+  $('itemCategory').value = rule.category;
+  $('itemPerson').value = rule.person;
+  $('itemAmount').value = Number(rule.amount).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+  $('itemDesc').value = rule.description || '';
+  $('itemNote').value = rule.notes || '';
+  populateAccountSelect();
+  $('itemAccount').value = rule.account_id || '';
+  populateTagSelect();
+  $('itemTag').value = rule.tag_id || '';
+
+  // No single occurrence is in context here, so hide the per-occurrence
+  // fields entirely — only the shared series fields apply.
+  $('recurringToggleWrap').style.display = 'none';
+  $('dueDateWrap').style.display = 'none';
+  $('postedWrap').style.display = 'none';
+  $('itemDue').required = false;
+
+  document.querySelector(`input[name="recurFrequency"][value="${rule.frequency}"]`).checked = true;
+  if (rule.day_option) {
+    document.querySelector(`input[name="dayOption"][value="${rule.day_option}"]`).checked = true;
+  }
+  if (rule.day_of_month) $('itemRecurDay').value = rule.day_of_month;
+  $('itemRecurStart').value = rule.start_date;
+  $('itemRecurEnd').value = rule.end_date || '';
+  $('recurringFieldsLabel').textContent = 'Series schedule — applies to every occurrence when you save.';
+  $('recurringFieldsLabel').style.display = 'block';
+  $('recurringFields').style.display = 'block';
+  updateFrequencyVisibility();
+
+  $('seriesEditNote').textContent = 'Editing the whole series. Changing the schedule will regenerate its occurrences (see warning on save).';
+  $('seriesEditNote').style.display = 'block';
+  $('deleteSeriesBtn').style.display = 'inline-block';
+  $('saveItemBtn').style.display = 'none';
+  $('saveSingleBtn').style.display = 'none';
+  $('saveSeriesBtn').style.display = 'inline-block';
+
+  $('itemOverlay').style.display = 'flex';
+}
+
+function renderAccountFilter() {
+  const bar = $('accountFilter');
+  bar.innerHTML = '';
+  const allBtn = document.createElement('button');
+  allBtn.className = 'acct-pill' + (currentAccountFilter === 'all' ? ' active' : '');
+  allBtn.textContent = 'All accounts';
+  allBtn.addEventListener('click', () => { currentAccountFilter = 'all'; renderAccountFilter(); render(); });
+  bar.appendChild(allBtn);
+  bankAccounts.forEach(acct => {
+    const btn = document.createElement('button');
+    btn.className = 'acct-pill' + (currentAccountFilter === acct.id ? ' active' : '');
+    btn.textContent = acct.name;
+    btn.addEventListener('click', () => { currentAccountFilter = acct.id; renderAccountFilter(); render(); });
+    bar.appendChild(btn);
+  });
+}
+
+function populateAccountSelect() {
+  const sel = $('itemAccount');
+  const prevValue = sel.value;
+  sel.innerHTML = '<option value="" disabled>Select an account…</option>' +
+    bankAccounts.map(a => `<option value="${a.id}">${escapeHtml(a.name)}</option>`).join('') +
+    '<option value="__new__">+ Add new account…</option>';
+  if (prevValue && bankAccounts.find(a => a.id === prevValue)) sel.value = prevValue;
+}
+
+$('itemAccount').addEventListener('change', async (e) => {
+  if (e.target.value !== '__new__') return;
+  const name = prompt('New account name (e.g. Joint Checking):');
+  if (!name || !name.trim()) { e.target.value = ''; return; }
+  const { data, error } = await sb.from('bank_accounts')
+    .insert({ user_id: currentUser.id, name: name.trim() })
+    .select().single();
+  if (error) { alert('Could not create account: ' + error.message); e.target.value = ''; return; }
+  await loadAccounts();
+  $('itemAccount').value = data.id;
+});
+
+// ---------------- TAGS ----------------
+let tags = [];
+
+async function loadTags() {
+  const { data, error } = await sb.from('tags').select('*').order('name', { ascending: true });
+  if (error) { console.error(error); return; }
+  tags = data || [];
+  populateTagSelect();
+  updateTagColumnWidth();
+}
+
+function measureTextWidth(text, font) {
+  const canvas = measureTextWidth._canvas || (measureTextWidth._canvas = document.createElement('canvas'));
+  const ctx = canvas.getContext('2d');
+  ctx.font = font;
+  return ctx.measureText(text).width;
+}
+
+function updateTagColumnWidth() {
+  const font = '12px Inter, system-ui, sans-serif';
+  let maxWidth = measureTextWidth('No tag', font);
+  tags.forEach(t => {
+    const w = measureTextWidth(t.name, font);
+    if (w > maxWidth) maxWidth = w;
+  });
+  // Room for the select's own padding, border, and dropdown arrow.
+  const px = Math.min(Math.max(Math.ceil(maxWidth) + 42, 90), 240);
+  document.documentElement.style.setProperty('--tag-col-width', px + 'px');
+}
+
+function getTagName(item) {
+  const tag = tags.find(t => t.id === item.tag_id);
+  return tag ? tag.name : '';
+}
+
+function populateTagSelect() {
+  const sel = $('itemTag');
+  const prevValue = sel.value;
+  sel.innerHTML = '<option value="">No tag</option>' +
+    tags.map(t => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('') +
+    '<option value="__new__">+ Add new tag…</option>';
+  if (prevValue && tags.find(t => t.id === prevValue)) sel.value = prevValue;
+}
+
+$('itemTag').addEventListener('change', async (e) => {
+  if (e.target.value !== '__new__') return;
+  const name = prompt('New tag name (e.g. Insurance):');
+  if (!name || !name.trim()) { e.target.value = ''; return; }
+  const { data, error } = await sb.from('tags')
+    .insert({ user_id: currentUser.id, name: name.trim() })
+    .select().single();
+  if (error) { alert('Could not create tag: ' + error.message); e.target.value = ''; return; }
+  await loadTags();
+  populateTagSelect();
+  $('itemTag').value = data.id;
+});
+
+const DEFAULT_TAG_COLOR = '#b8935f';
+function getTagColorById(tagId) {
+  const tag = tags.find(t => t.id === tagId);
+  return (tag && tag.color) || DEFAULT_TAG_COLOR;
+}
+
+function renderManageTags() {
+  const wrap = $('manageTagRows');
+  wrap.innerHTML = '';
+  if (tags.length === 0) {
+    wrap.innerHTML = '<div class="empty-note">No tags yet — add one below.</div>';
+    return;
+  }
+  const header = document.createElement('div');
+  header.className = 'acct-row tag-row list-col-header';
+  header.innerHTML = `<span></span><span>Name</span><span></span><span></span>`;
+  wrap.appendChild(header);
+
+  tags.forEach(tag => {
+    const count = items.filter(i => i.tag_id === tag.id).length;
+    const row = document.createElement('div');
+    row.className = 'acct-row tag-row';
+    row.innerHTML = `
+      <input type="color" value="${tag.color || DEFAULT_TAG_COLOR}" title="Tag color">
+      <input type="text" value="${escapeHtml(tag.name)}">
+      <span class="acct-count">${count} item${count === 1 ? '' : 's'}</span>
+      <button type="button" class="acct-del">Delete</button>
+    `;
+    const colorInput = row.querySelector('input[type="color"]');
+    const nameInput = row.querySelector('input[type="text"]');
+    colorInput.addEventListener('change', async () => {
+      const { error } = await sb.from('tags').update({ color: colorInput.value }).eq('id', tag.id);
+      if (error) { showTagManageError('Could not update color: ' + error.message); colorInput.value = tag.color || DEFAULT_TAG_COLOR; return; }
+      await loadTags();
+      renderManageTags();
+      render();
+    });
+    nameInput.addEventListener('change', async () => {
+      const newName = nameInput.value.trim();
+      if (!newName || newName === tag.name) { nameInput.value = tag.name; return; }
+      const { error } = await sb.from('tags').update({ name: newName }).eq('id', tag.id);
+      if (error) { showTagManageError('Could not rename: ' + error.message); nameInput.value = tag.name; return; }
+      await loadTags();
+      renderManageTags();
+    });
+    row.querySelector('.acct-del').addEventListener('click', async () => {
+      const msg = count > 0
+        ? `Delete "${tag.name}"? ${count} item${count === 1 ? '' : 's'} will lose this tag, not be deleted.`
+        : `Delete "${tag.name}"?`;
+      if (!confirm(msg)) return;
+      const { error } = await sb.from('tags').delete().eq('id', tag.id);
+      if (error) { showTagManageError('Could not delete: ' + error.message); return; }
+      await loadTags();
+      await loadItems();
+      renderManageTags();
+    });
+    wrap.appendChild(row);
+  });
+}
+
+function showTagManageError(msg) {
+  const el = $('tagManageError');
+  el.textContent = msg;
+  el.style.display = 'block';
+  setTimeout(() => { el.style.display = 'none'; }, 4000);
+}
+
+$('newTagForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const name = $('newTagName').value.trim();
+  if (!name) return;
+  const { error } = await sb.from('tags').insert({ user_id: currentUser.id, name });
+  if (error) { showTagManageError('Could not add tag: ' + error.message); return; }
+  $('newTagName').value = '';
+  await loadTags();
+  renderManageTags();
+});
+
+// ---------------- MANAGE ACCOUNTS VIEW ----------------
+function renderManageAccounts() {
+  const wrap = $('manageAccountRows');
+  wrap.innerHTML = '';
+  if (bankAccounts.length === 0) {
+    wrap.innerHTML = '<div class="empty-note">No accounts yet — add one below.</div>';
+    return;
+  }
+  const header = document.createElement('div');
+  header.className = 'acct-row bank-acct-row list-col-header';
+  header.innerHTML = `<span>Name</span><span>Starting balance</span><span>As of</span><span></span><span></span>`;
+  wrap.appendChild(header);
+
+  bankAccounts.forEach(acct => {
+    const count = items.filter(i => i.account_id === acct.id).length;
+    const row = document.createElement('div');
+    row.className = 'acct-row bank-acct-row';
+    row.innerHTML = `
+      <input type="text" value="${escapeHtml(acct.name)}">
+      <input type="text" inputmode="decimal" class="balance-input" value="${Number(acct.starting_balance || 0).toFixed(2)}" title="Starting balance">
+      <input type="date" value="${acct.starting_balance_date || ''}" title="As of date">
+      <span class="acct-count">${count} item${count === 1 ? '' : 's'}</span>
+      <button type="button" class="acct-del">Delete</button>
+    `;
+    const nameInput = row.querySelector('input[type="text"]:not(.balance-input)');
+    const balanceInput = row.querySelector('.balance-input');
+    const dateInput = row.querySelector('input[type="date"]');
+    nameInput.addEventListener('change', async () => {
+      const newName = nameInput.value.trim();
+      if (!newName || newName === acct.name) { nameInput.value = acct.name; return; }
+      const { error } = await sb.from('bank_accounts').update({ name: newName }).eq('id', acct.id);
+      if (error) { showManageError('Could not rename: ' + error.message); nameInput.value = acct.name; return; }
+      await loadAccounts();
+    });
+    balanceInput.addEventListener('input', formatCurrencyLive);
+    balanceInput.addEventListener('change', async () => {
+      const newBalance = parseFloat(balanceInput.value.replace(/,/g, ''));
+      const safeBalance = isNaN(newBalance) ? 0 : newBalance;
+      if (safeBalance === Number(acct.starting_balance || 0)) { balanceInput.value = safeBalance.toFixed(2); return; }
+      const { error } = await sb.from('bank_accounts').update({ starting_balance: safeBalance }).eq('id', acct.id);
+      if (error) { showManageError('Could not update starting balance: ' + error.message); balanceInput.value = Number(acct.starting_balance || 0).toFixed(2); return; }
+      await loadAccounts();
+      render();
+    });
+    dateInput.addEventListener('change', async () => {
+      const newDate = dateInput.value || null;
+      if (newDate === (acct.starting_balance_date || null)) return;
+      const { error } = await sb.from('bank_accounts').update({ starting_balance_date: newDate }).eq('id', acct.id);
+      if (error) { showManageError('Could not update the as-of date: ' + error.message); dateInput.value = acct.starting_balance_date || ''; return; }
+      await loadAccounts();
+      render();
+    });
+    row.querySelector('.acct-del').addEventListener('click', async () => {
+      const msg = count > 0
+        ? `Delete "${acct.name}"? ${count} item${count === 1 ? '' : 's'} will become Unassigned, not deleted.`
+        : `Delete "${acct.name}"?`;
+      if (!confirm(msg)) return;
+      const { error } = await sb.from('bank_accounts').delete().eq('id', acct.id);
+      if (error) { showManageError('Could not delete: ' + error.message); return; }
+      await loadAccounts();
+      await loadItems();
+      render();
+    });
+    wrap.appendChild(row);
+  });
+}
+
+function showManageError(msg) {
+  const el = $('manageError');
+  el.textContent = msg;
+  el.style.display = 'block';
+  setTimeout(() => { el.style.display = 'none'; }, 4000);
+}
+
+$('newAccountForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const name = $('newAccountName').value.trim();
+  if (!name) return;
+  const { error } = await sb.from('bank_accounts').insert({ user_id: currentUser.id, name });
+  if (error) { showManageError('Could not add account: ' + error.message); return; }
+  $('newAccountName').value = '';
+  await loadAccounts();
+});
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ---------------- NAV ----------------
+const NON_BUDGET_VIEWS = ['manage', 'recurring', 'tags', 'reports'];
+document.querySelectorAll('.nav-item').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentView = btn.dataset.view;
+    $('listView').style.display = currentView === 'list' ? 'block' : 'none';
+    $('calendarView').style.display = currentView === 'calendar' ? 'block' : 'none';
+    $('manageView').style.display = currentView === 'manage' ? 'block' : 'none';
+    $('recurringView').style.display = currentView === 'recurring' ? 'block' : 'none';
+    $('tagsView').style.display = currentView === 'tags' ? 'block' : 'none';
+    $('reportsView').style.display = currentView === 'reports' ? 'block' : 'none';
+    const isBudgetView = !NON_BUDGET_VIEWS.includes(currentView);
+    $('budgetChrome').style.display = isBudgetView ? 'block' : 'none';
+    $('openAddModal').style.display = isBudgetView ? 'inline-flex' : 'none';
+    $('openTransferModal').style.display = isBudgetView ? 'inline-flex' : 'none';
+    if (currentView === 'manage') renderManageAccounts();
+    else if (currentView === 'recurring') { await loadRecurringRules(); renderRecurringManage(); }
+    else if (currentView === 'tags') { await loadTags(); renderManageTags(); }
+    else if (currentView === 'reports') { initReportFiltersIfNeeded(); renderReports(); }
+    else render();
+  });
+});
+
+$('prevMonth').addEventListener('click', () => { currentDate.setMonth(currentDate.getMonth() - 1); render(); });
+$('nextMonth').addEventListener('click', () => { currentDate.setMonth(currentDate.getMonth() + 1); render(); });
+
+// ---------------- MODAL ----------------
+function lastBusinessDayOfMonth(year, monthIndex) {
+  const d = new Date(year, monthIndex + 1, 0); // last calendar day of month
+  const dow = d.getDay();
+  if (dow === 0) d.setDate(d.getDate() - 2); // Sunday -> Friday
+  else if (dow === 6) d.setDate(d.getDate() - 1); // Saturday -> Friday
+  return d;
+}
+
+function specificDayOfMonth(year, monthIndex, day) {
+  const lastDay = new Date(year, monthIndex + 1, 0).getDate();
+  return new Date(year, monthIndex, Math.min(day, lastDay));
+}
+
+function generateOccurrenceDates(rule) {
+  const dates = [];
+  const start = new Date(rule.start_date + 'T00:00:00');
+  const explicitEnd = rule.end_date ? new Date(rule.end_date + 'T00:00:00') : null;
+  const cap = new Date(start);
+  cap.setMonth(cap.getMonth() + 24); // safety cap so "no end date" doesn't generate forever
+  const hardEnd = explicitEnd && explicitEnd < cap ? explicitEnd : cap;
+
+  if (rule.frequency === 'biweekly') {
+    const cursor = new Date(start);
+    while (cursor <= hardEnd) {
+      dates.push(cursor.toISOString().slice(0,10));
+      cursor.setDate(cursor.getDate() + 14);
+    }
+    return dates;
+  }
+
+  const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
+  while (cursor <= hardEnd) {
+    const occ = rule.day_option === 'last_business_day'
+      ? lastBusinessDayOfMonth(cursor.getFullYear(), cursor.getMonth())
+      : specificDayOfMonth(cursor.getFullYear(), cursor.getMonth(), rule.day_of_month);
+    if (occ >= start && occ <= hardEnd) dates.push(occ.toISOString().slice(0,10));
+    cursor.setMonth(cursor.getMonth() + 1);
+  }
+  return dates;
+}
+
+function updateFrequencyVisibility() {
+  const freq = document.querySelector('input[name="recurFrequency"]:checked').value;
+  $('monthlyDayOptions').style.display = freq === 'monthly' ? 'block' : 'none';
+  $('recurringHint').textContent = freq === 'biweekly'
+    ? 'Repeats every 14 days from the start date. Leave end date blank to schedule up to 2 years out.'
+    : 'Leave end date blank to schedule up to 2 years out; you can always add more later.';
+}
+document.querySelectorAll('input[name="recurFrequency"]').forEach(r => r.addEventListener('change', updateFrequencyVisibility));
+
+function updateRecurringToggleVisibility() {
+  const isEditing = !!$('itemId').value;
+  const eligible = RECURRING_CATEGORIES.includes($('itemCategory').value);
+  $('recurringToggleWrap').style.display = (!isEditing && eligible) ? 'block' : 'none';
+  if (isEditing || !eligible) {
+    $('itemRecurring').checked = false;
+    updateRecurringFieldsVisibility();
+  }
+}
+
+function updateRecurringFieldsVisibility() {
+  const on = $('itemRecurring').checked;
+  $('recurringFields').style.display = on ? 'block' : 'none';
+  $('dueDateWrap').style.display = on ? 'none' : 'block';
+  $('postedWrap').style.display = on ? 'none' : 'block';
+  $('itemDue').required = !on;
+}
+
+$('itemCategory').addEventListener('change', updateRecurringToggleVisibility);
+$('itemRecurring').addEventListener('change', updateRecurringFieldsVisibility);
+
+function openModal(editItem, duplicateFrom) {
+  $('itemError').style.display = 'none';
+  $('itemRecurring').checked = false;
+  $('deleteSeriesBtn').style.display = 'none';
+  $('seriesEditNote').style.display = 'none';
+  $('recurringFieldsLabel').style.display = 'none';
+  $('saveItemBtn').style.display = 'inline-block';
+  $('saveSingleBtn').style.display = 'none';
+  $('saveSeriesBtn').style.display = 'none';
+  $('itemRecurringRuleId').value = '';
+  if (editItem) {
+    $('modalTitle').textContent = 'Edit budget item';
+    $('itemId').value = editItem.id;
+    $('itemCategory').value = editItem.category;
+    $('itemPerson').value = editItem.person;
+    $('itemAmount').value = Number(editItem.amount).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+    $('itemDesc').value = editItem.description || '';
+    $('itemNote').value = editItem.notes || '';
+    populateAccountSelect();
+    $('itemAccount').value = editItem.account_id || '';
+    populateTagSelect();
+    $('itemTag').value = editItem.tag_id || '';
+    $('itemDue').value = editItem.due_date;
+    $('itemPosted').checked = !!editItem.posted;
+    if (editItem.recurring_rule_id) {
+      $('itemRecurringRuleId').value = editItem.recurring_rule_id;
+      $('deleteSeriesBtn').style.display = 'inline-block';
+      $('seriesEditNote').textContent = 'This is part of a recurring series. "Save entire series" updates the person, description, note, amount, category, and account for every occurrence — the due date and posted status here only apply to this one.';
+      $('seriesEditNote').style.display = 'block';
+      $('saveItemBtn').style.display = 'none';
+      $('saveSingleBtn').style.display = 'inline-block';
+      $('saveSeriesBtn').style.display = 'inline-block';
+    } else if (editItem.transfer_group_id) {
+      $('seriesEditNote').textContent = 'This is one side of a transfer between accounts. Saving here only updates this side — use the delete button if you need to remove the whole transfer.';
+      $('seriesEditNote').style.display = 'block';
+    }
+  } else if (duplicateFrom) {
+    $('modalTitle').textContent = 'Duplicate item';
+    $('itemForm').reset();
+    $('itemId').value = '';
+    $('itemCategory').value = duplicateFrom.category;
+    $('itemPerson').value = duplicateFrom.person;
+    $('itemAmount').value = Number(duplicateFrom.amount).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+    $('itemDesc').value = duplicateFrom.description || '';
+    $('itemNote').value = duplicateFrom.notes || '';
+    populateAccountSelect();
+    $('itemAccount').value = duplicateFrom.account_id || '';
+    populateTagSelect();
+    $('itemTag').value = duplicateFrom.tag_id || '';
+    $('itemDue').value = duplicateFrom.due_date;
+    $('itemPosted').checked = false;
+  } else {
+    $('modalTitle').textContent = 'Add budget item';
+    $('itemForm').reset();
+    $('itemId').value = '';
+    populateAccountSelect();
+    populateTagSelect();
+    if (currentAccountFilter !== 'all') $('itemAccount').value = currentAccountFilter;
+    const d = new Date(currentDate);
+    $('itemDue').value = d.toISOString().slice(0,10);
+    $('itemRecurStart').value = d.toISOString().slice(0,10);
+  }
+  updateRecurringToggleVisibility();
+  updateRecurringFieldsVisibility();
+  updateFrequencyVisibility();
+  $('itemOverlay').style.display = 'flex';
+
+  // For a series occurrence, also reveal (and populate) the schedule fields
+  // so "Save entire series" can update frequency/day/start/end too.
+  if (editItem && editItem.recurring_rule_id) {
+    loadRuleIntoScheduleFields(editItem.recurring_rule_id);
+  }
+}
+
+async function loadRuleIntoScheduleFields(ruleId) {
+  const { data: rule, error } = await sb.from('recurring_rules').select('*').eq('id', ruleId).single();
+  if (error || !rule) return;
+  document.querySelector(`input[name="recurFrequency"][value="${rule.frequency}"]`).checked = true;
+  if (rule.day_option) {
+    document.querySelector(`input[name="dayOption"][value="${rule.day_option}"]`).checked = true;
+  }
+  if (rule.day_of_month) $('itemRecurDay').value = rule.day_of_month;
+  $('itemRecurStart').value = rule.start_date;
+  $('itemRecurEnd').value = rule.end_date || '';
+  $('recurringFieldsLabel').textContent = 'Series schedule — only used when you choose "Save entire series" below. The due date above applies to this occurrence only.';
+  $('recurringFieldsLabel').style.display = 'block';
+  $('recurringFields').style.display = 'block';
+  updateFrequencyVisibility();
+}
+function closeModal() { $('itemOverlay').style.display = 'none'; }
+
+$('openAddModal').addEventListener('click', () => openModal(null));
+
+function openModalWithCategory(cat) {
+  openModal(null);
+  $('itemCategory').value = cat;
+  updateRecurringToggleVisibility();
+  updateRecurringFieldsVisibility();
+}
+$('cancelItemBtn').addEventListener('click', closeModal);
+$('itemOverlay').addEventListener('click', (e) => { if (e.target === $('itemOverlay')) closeModal(); });
+
+async function refreshAfterSeriesChange() {
+  await loadItems();
+  if (currentView === 'recurring') {
+    await loadRecurringRules();
+    renderRecurringManage();
+  } else {
+    render();
+  }
+}
+
+$('deleteSeriesBtn').addEventListener('click', async () => {
+  const ruleId = $('itemRecurringRuleId').value;
+  if (!ruleId) return;
+  if (!confirm('Delete this entire recurring series? All past and future occurrences will be removed.')) return;
+  const { error } = await sb.from('recurring_rules').delete().eq('id', ruleId);
+  if (error) { alert('Could not delete series: ' + error.message); return; }
+  closeModal();
+  await refreshAfterSeriesChange();
+});
+
+function validateAndCollectFields() {
+  if (!$('itemAccount').value || $('itemAccount').value === '__new__') {
+    $('itemError').textContent = 'Please choose a bank account.';
+    $('itemError').style.display = 'block';
+    return null;
+  }
+  return {
+    category: $('itemCategory').value,
+    person: $('itemPerson').value.trim(),
+    amount: parseCurrencyInput($('itemAmount').value),
+    description: $('itemDesc').value.trim(),
+    notes: $('itemNote').value.trim(),
+    account_id: $('itemAccount').value,
+    tag_id: $('itemTag').value === '__new__' ? null : ($('itemTag').value || null)
+  };
+}
+
+$('saveSingleBtn').addEventListener('click', async () => {
+  const fields = validateAndCollectFields();
+  if (!fields) return;
+  const id = $('itemId').value;
+  const payload = {
+    ...fields,
+    due_date: $('itemDue').value,
+    posted: $('itemPosted').checked,
+    posted_at: $('itemPosted').checked ? new Date().toISOString() : null
+  };
+  $('saveSingleBtn').textContent = 'Saving…';
+  try {
+    const { error } = await sb.from('budget_items').update(payload).eq('id', id);
+    if (error) throw error;
+    closeModal();
+    await loadItems();
+    render();
+  } catch (err) {
+    $('itemError').textContent = err.message || 'Could not save item.';
+    $('itemError').style.display = 'block';
+  } finally {
+    $('saveSingleBtn').textContent = 'Save this one';
+  }
+});
+
+$('saveSeriesBtn').addEventListener('click', async () => {
+  const fields = validateAndCollectFields();
+  if (!fields) return;
+  const ruleId = $('itemRecurringRuleId').value;
+  if (!ruleId) return;
+
+  const frequency = document.querySelector('input[name="recurFrequency"]:checked').value;
+  const dayOption = document.querySelector('input[name="dayOption"]:checked').value;
+  const startDate = $('itemRecurStart').value;
+  const endDate = $('itemRecurEnd').value || null;
+  if (!startDate) {
+    $('itemError').textContent = 'Please choose a start date for the series.';
+    $('itemError').style.display = 'block';
+    return;
+  }
+  const scheduleFields = {
+    frequency,
+    day_option: frequency === 'monthly' ? dayOption : null,
+    day_of_month: frequency === 'monthly' && dayOption === 'specific_date' ? parseInt($('itemRecurDay').value, 10) : null,
+    start_date: startDate,
+    end_date: endDate
+  };
+
+  const { data: existingRule } = await sb.from('recurring_rules').select('*').eq('id', ruleId).single();
+  const scheduleChanged = !existingRule ||
+    existingRule.frequency !== scheduleFields.frequency ||
+    existingRule.day_option !== scheduleFields.day_option ||
+    existingRule.day_of_month !== scheduleFields.day_of_month ||
+    existingRule.start_date !== scheduleFields.start_date ||
+    (existingRule.end_date || null) !== scheduleFields.end_date;
+
+  const confirmMsg = scheduleChanged
+    ? 'This changes the series schedule, so its occurrences will be regenerated. Existing occurrences whose date no longer matches the new schedule will be replaced (and any "posted" marks on those will be lost). Continue?'
+    : 'Update every occurrence in this series with these values? Each occurrence keeps its own due date and posted status.';
+  if (!confirm(confirmMsg)) return;
+
+  $('saveSeriesBtn').textContent = 'Saving…';
+  try {
+    const { data: updatedRule, error: ruleError } = await sb.from('recurring_rules')
+      .update({ ...fields, ...scheduleFields }).eq('id', ruleId).select().single();
+    if (ruleError) throw ruleError;
+
+    if (!scheduleChanged) {
+      const { error: itemsError } = await sb.from('budget_items').update(fields).eq('recurring_rule_id', ruleId);
+      if (itemsError) throw itemsError;
+    } else {
+      // Preserve posted status for occurrences whose date survives unchanged.
+      const { data: oldOccurrences } = await sb.from('budget_items').select('due_date, posted, posted_at').eq('recurring_rule_id', ruleId);
+      const postedByDate = {};
+      (oldOccurrences || []).forEach(o => { if (o.posted) postedByDate[o.due_date] = o.posted_at; });
+
+      const { error: deleteError } = await sb.from('budget_items').delete().eq('recurring_rule_id', ruleId);
+      if (deleteError) throw deleteError;
+
+      const newDates = generateOccurrenceDates(updatedRule);
+      const rows = newDates.map(dueDate => ({
+        user_id: currentUser.id,
+        category: updatedRule.category,
+        person: updatedRule.person,
+        description: updatedRule.description,
+        notes: updatedRule.notes,
+        amount: updatedRule.amount,
+        account_id: updatedRule.account_id,
+        tag_id: updatedRule.tag_id,
+        due_date: dueDate,
+        posted: !!postedByDate[dueDate],
+        posted_at: postedByDate[dueDate] || null,
+        recurring_rule_id: ruleId
+      }));
+      if (rows.length > 0) {
+        const { error: insertError } = await sb.from('budget_items').insert(rows);
+        if (insertError) throw insertError;
+      }
+    }
+    closeModal();
+    await refreshAfterSeriesChange();
+  } catch (err) {
+    $('itemError').textContent = err.message || 'Could not update series.';
+    $('itemError').style.display = 'block';
+  } finally {
+    $('saveSeriesBtn').textContent = 'Save entire series';
+  }
+});
+
+$('itemForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if ($('itemRecurringRuleId').value) {
+    // Editing an occurrence that belongs to a series — route Enter-key
+    // submission to the same place as the "Save this one" button.
+    $('saveSingleBtn').click();
+    return;
+  }
+  if (!$('itemAccount').value || $('itemAccount').value === '__new__') {
+    $('itemError').textContent = 'Please choose a bank account.';
+    $('itemError').style.display = 'block';
+    return;
+  }
+  const id = $('itemId').value;
+  const isRecurring = !id && $('itemRecurring').checked;
+
+  if (isRecurring) {
+    const frequency = document.querySelector('input[name="recurFrequency"]:checked').value;
+    const dayOption = document.querySelector('input[name="dayOption"]:checked').value;
+    const startDate = $('itemRecurStart').value;
+    if (!startDate) {
+      $('itemError').textContent = 'Please choose a start date for the recurring series.';
+      $('itemError').style.display = 'block';
+      return;
+    }
+    const rulePayload = {
+      user_id: currentUser.id,
+      category: $('itemCategory').value,
+      person: $('itemPerson').value.trim(),
+      description: $('itemDesc').value.trim(),
+      notes: $('itemNote').value.trim(),
+      amount: parseCurrencyInput($('itemAmount').value),
+      account_id: $('itemAccount').value,
+      tag_id: $('itemTag').value === '__new__' ? null : ($('itemTag').value || null),
+      frequency,
+      day_option: frequency === 'monthly' ? dayOption : null,
+      day_of_month: frequency === 'monthly' && dayOption === 'specific_date' ? parseInt($('itemRecurDay').value, 10) : null,
+      start_date: startDate,
+      end_date: $('itemRecurEnd').value || null
+    };
+    $('saveItemBtn').textContent = 'Saving…';
+    try {
+      const { data: rule, error: ruleError } = await sb.from('recurring_rules').insert(rulePayload).select().single();
+      if (ruleError) throw ruleError;
+      const occurrenceDates = generateOccurrenceDates(rule);
+      const rows = occurrenceDates.map(dueDate => ({
+        user_id: currentUser.id,
+        category: rule.category,
+        person: rule.person,
+        description: rule.description,
+        notes: rule.notes,
+        amount: rule.amount,
+        account_id: rule.account_id,
+        tag_id: rule.tag_id,
+        due_date: dueDate,
+        posted: false,
+        recurring_rule_id: rule.id
+      }));
+      if (rows.length > 0) {
+        const { error: itemsError } = await sb.from('budget_items').insert(rows);
+        if (itemsError) throw itemsError;
+      }
+      closeModal();
+      await loadItems();
+      render();
+    } catch (err) {
+      $('itemError').textContent = err.message || 'Could not save recurring series.';
+      $('itemError').style.display = 'block';
+    } finally {
+      $('saveItemBtn').textContent = 'Save item';
+    }
+    return;
+  }
+
+  const payload = {
+    category: $('itemCategory').value,
+    person: $('itemPerson').value.trim(),
+    amount: parseCurrencyInput($('itemAmount').value),
+    description: $('itemDesc').value.trim(),
+    notes: $('itemNote').value.trim(),
+    account_id: $('itemAccount').value,
+    tag_id: $('itemTag').value === '__new__' ? null : ($('itemTag').value || null),
+    due_date: $('itemDue').value,
+    posted: $('itemPosted').checked,
+    posted_at: $('itemPosted').checked ? new Date().toISOString() : null,
+    user_id: currentUser.id
+  };
+  $('saveItemBtn').textContent = 'Saving…';
+  try {
+    let error;
+    if (id) {
+      ({ error } = await sb.from('budget_items').update(payload).eq('id', id));
+    } else {
+      ({ error } = await sb.from('budget_items').insert(payload));
+    }
+    if (error) throw error;
+    closeModal();
+    await loadItems();
+    render();
+  } catch (err) {
+    $('itemError').textContent = err.message || 'Could not save item.';
+    $('itemError').style.display = 'block';
+  } finally {
+    $('saveItemBtn').textContent = 'Save item';
+  }
+});
+
+
+async function deleteItem(id) {
+  const item = items.find(i => i.id === id);
+  if (item && item.transfer_group_id) {
+    if (!confirm('This is one side of a transfer between accounts. Delete both sides?')) return;
+    const { error } = await sb.from('budget_items').delete().eq('transfer_group_id', item.transfer_group_id);
+    if (error) { alert('Could not delete transfer: ' + error.message); return; }
+    await loadItems();
+    render();
+    return;
+  }
+  if (!confirm('Remove this item?')) return;
+  const { error } = await sb.from('budget_items').delete().eq('id', id);
+  if (error) { alert('Could not delete: ' + error.message); return; }
+  await loadItems();
+  render();
+}
+
+function populateTransferSelects() {
+  const options = bankAccounts.map(a => `<option value="${a.id}">${escapeHtml(a.name)}</option>`).join('');
+  $('transferFrom').innerHTML = options;
+  $('transferTo').innerHTML = options;
+}
+
+function openTransferModal() {
+  $('transferError').style.display = 'none';
+  $('transferForm').reset();
+  populateTransferSelects();
+  if (bankAccounts.length >= 2) {
+    $('transferFrom').value = bankAccounts[0].id;
+    $('transferTo').value = bankAccounts[1].id;
+  }
+  $('transferDate').value = new Date().toISOString().slice(0,10);
+  $('transferOverlay').style.display = 'flex';
+}
+function closeTransferModal() { $('transferOverlay').style.display = 'none'; }
+
+$('openTransferModal').addEventListener('click', openTransferModal);
+$('cancelTransferBtn').addEventListener('click', closeTransferModal);
+$('transferOverlay').addEventListener('click', (e) => { if (e.target === $('transferOverlay')) closeTransferModal(); });
+
+$('transferForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fromId = $('transferFrom').value;
+  const toId = $('transferTo').value;
+  const amount = parseCurrencyInput($('transferAmount').value);
+  const date = $('transferDate').value;
+  const note = $('transferNote').value.trim();
+
+  if (!fromId || !toId) {
+    $('transferError').textContent = 'Please choose both accounts.';
+    $('transferError').style.display = 'block';
+    return;
+  }
+  if (fromId === toId) {
+    $('transferError').textContent = 'The two accounts must be different.';
+    $('transferError').style.display = 'block';
+    return;
+  }
+  if (!amount || amount <= 0) {
+    $('transferError').textContent = 'Please enter an amount greater than 0.';
+    $('transferError').style.display = 'block';
+    return;
+  }
+
+  const fromName = bankAccounts.find(a => a.id === fromId)?.name || 'account';
+  const toName = bankAccounts.find(a => a.id === toId)?.name || 'account';
+  const groupId = crypto.randomUUID();
+
+  $('saveTransferBtn').textContent = 'Saving…';
+  try {
+    const rows = [
+      {
+        user_id: currentUser.id,
+        category: 'transfer_out',
+        person: 'Transfer',
+        description: `Transfer to ${toName}`,
+        notes: note,
+        amount,
+        account_id: fromId,
+        due_date: date,
+        posted: false,
+        transfer_group_id: groupId
+      },
+      {
+        user_id: currentUser.id,
+        category: 'transfer_in',
+        person: 'Transfer',
+        description: `Transfer from ${fromName}`,
+        notes: note,
+        amount,
+        account_id: toId,
+        due_date: date,
+        posted: false,
+        transfer_group_id: groupId
+      }
+    ];
+    const { error } = await sb.from('budget_items').insert(rows);
+    if (error) throw error;
+    closeTransferModal();
+    await loadItems();
+    render();
+  } catch (err) {
+    $('transferError').textContent = err.message || 'Could not save transfer.';
+    $('transferError').style.display = 'block';
+  } finally {
+    $('saveTransferBtn').textContent = 'Save transfer';
+  }
+});
+
+
+async function togglePosted(id, checked) {
+  const { error } = await sb.from('budget_items')
+    .update({ posted: checked, posted_at: checked ? new Date().toISOString() : null })
+    .eq('id', id);
+  if (error) { alert('Could not update: ' + error.message); return; }
+  await loadItems();
+  render();
+}
+
+// ---------------- RENDER ----------------
+function monthItems() {
+  const y = currentDate.getFullYear(), m = currentDate.getMonth();
+  return items.filter(i => {
+    const d = new Date(i.due_date + 'T00:00:00');
+    const inMonth = d.getFullYear() === y && d.getMonth() === m;
+    const inAccount = currentAccountFilter === 'all' || i.account_id === currentAccountFilter;
+    return inMonth && inAccount;
+  });
+}
+
+function getStartingBalanceTotal(beforeDate) {
+  // beforeDate (optional): only count balances with no as-of date, or an
+  // as-of date strictly before this cutoff — a dated balance landing on or
+  // after the cutoff is treated as "current", not "prior", to avoid
+  // double-counting it once it's shown in place within its own month.
+  const relevantAccounts = currentAccountFilter === 'all' ? bankAccounts : bankAccounts.filter(a => a.id === currentAccountFilter);
+  return relevantAccounts.reduce((s,a) => {
+    const bal = Number(a.starting_balance || 0);
+    if (bal === 0) return s;
+    if (!a.starting_balance_date) return s + bal;
+    if (!beforeDate) return s + bal;
+    const balDate = new Date(a.starting_balance_date + 'T00:00:00');
+    return balDate < beforeDate ? s + bal : s;
+  }, 0);
+}
+
+function getPriorMonthsTotal() {
+  const monthStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+  const accountFiltered = items.filter(i => currentAccountFilter === 'all' || i.account_id === currentAccountFilter);
+  const itemsTotal = accountFiltered
+    .filter(i => new Date(i.due_date + 'T00:00:00') < monthStart)
+    .reduce((s,i) => s + (isCredit(i.category) ? Number(i.amount) : -Number(i.amount)), 0);
+  return getStartingBalanceTotal(monthStart) + itemsTotal;
+}
+
+function render() {
+  $('monthLabel').textContent = currentDate.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  const mi = monthItems();
+
+  const income = mi.filter(i => i.category === 'income').reduce((s,i) => s + Number(i.amount), 0);
+  const out = mi.filter(i => i.category !== 'income' && i.category !== 'transfer_in' && i.category !== 'transfer_out')
+    .reduce((s,i) => s + Number(i.amount), 0);
+  const transferNet = mi.filter(i => i.category === 'transfer_in').reduce((s,i) => s + Number(i.amount), 0)
+    - mi.filter(i => i.category === 'transfer_out').reduce((s,i) => s + Number(i.amount), 0);
+  const unverified = mi.filter(i => !i.posted).length;
+  const netThisMonth = income - out + transferNet;
+
+  // Prior-months carryover: net of every item dated before the first day of
+  // the currently viewed month, honoring the active account filter — a
+  // running total that grows or shrinks as you move through history.
+  const priorTotal = getPriorMonthsTotal();
+  const grandTotal = priorTotal + netThisMonth;
+
+  $('sumIncome').textContent = fmtMoney(income);
+  $('sumOut').textContent = fmtMoney(out);
+  $('sumNet').textContent = fmtMoney(netThisMonth);
+  $('sumNetCard').className = 'sum-card ' + (netThisMonth >= 0 ? 'pos' : 'neg');
+  $('sumPrior').textContent = fmtMoney(priorTotal);
+  $('sumPriorCard').className = 'sum-card ' + (priorTotal >= 0 ? 'pos' : 'neg');
+  $('sumGrand').textContent = fmtMoney(grandTotal);
+  $('sumGrandCard').className = 'sum-card ' + (grandTotal >= 0 ? 'pos' : 'neg');
+  $('sumUnverified').textContent = unverified;
+
+  if (currentView === 'list') renderList(mi);
+  else renderCalendar(mi);
+}
+
+let listSortMode = 'category'; // 'category' | 'date'
+let categoryDateDir = 'desc'; // 'desc' (newest first) | 'asc' (oldest first)
+let flatDateDir = 'desc'; // 'desc' (newest first) | 'asc' (oldest first) for the By-date view
+let dateRangeMode = 'month'; // 'month' | 'last3' | 'last6' | 'last9' | 'last12' | 'custom'
+let customRangeStart = '';
+let customRangeEnd = '';
+
+function getRangeBounds() {
+  const monthStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+  const monthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+  if (dateRangeMode === 'month') return { start: monthStart, end: monthEnd };
+  if (dateRangeMode === 'custom') {
+    const start = customRangeStart ? new Date(customRangeStart + 'T00:00:00') : monthStart;
+    const end = customRangeEnd ? new Date(customRangeEnd + 'T00:00:00') : monthEnd;
+    return { start, end };
+  }
+  const monthsBack = { last3: 3, last6: 6, last9: 9, last12: 12 }[dateRangeMode] || 1;
+  const start = new Date(currentDate.getFullYear(), currentDate.getMonth() - (monthsBack - 1), 1);
+  return { start, end: monthEnd };
+}
+
+function getRangeFilteredItems() {
+  const { start, end } = getRangeBounds();
+  return items.filter(i => {
+    const d = new Date(i.due_date + 'T00:00:00');
+    const inRange = d >= start && d <= end;
+    const inAccount = currentAccountFilter === 'all' || i.account_id === currentAccountFilter;
+    return inRange && inAccount;
+  });
+}
+
+function buildItemRow(item, cat, runningBalance) {
+  const row = document.createElement('div');
+  row.className = 'item-row';
+  const dueDate = new Date(item.due_date + 'T00:00:00');
+  const tagOptionsHtml = '<option value="">No tag</option>' +
+    tags.map(t => `<option value="${t.id}" ${item.tag_id === t.id ? 'selected' : ''}>${escapeHtml(t.name)}</option>`).join('');
+  const tagBorderColor = item.tag_id ? getTagColorById(item.tag_id) : 'var(--line)';
+  row.innerHTML = `
+    <input type="checkbox" class="post-toggle" ${item.posted ? 'checked' : ''} title="Mark posted">
+    <div class="item-desc">${escapeHtml(item.description || CATEGORY_LABELS[cat])}
+      <span class="cat-note">${escapeHtml(item.person)} · ${escapeHtml(getAccountName(item))}</span>
+    </div>
+    <span class="who-tag">${escapeHtml(item.person)}</span>
+    <div class="item-note" title="${escapeHtml(item.notes || '')}">${escapeHtml(item.notes || '')}</div>
+    <select class="item-tag-select" title="Tag" style="border-left:4px solid ${tagBorderColor};">${tagOptionsHtml}</select>
+    <div class="item-amt-wrap">
+      <div class="item-amt ${isCredit(cat) ? 'income' : ''}">${isCredit(cat) ? '+' : '-'}${fmtMoney(Math.abs(item.amount))}</div>
+      ${runningBalance !== undefined ? `<div class="item-balance${runningBalance < 0 ? ' negative' : ''}">${fmtMoney(runningBalance)} left</div>` : ''}
+    </div>
+    <div class="item-due">${dueDate.toLocaleDateString(undefined,{month:'short',day:'numeric'})}</div>
+    <div class="post-check">${item.posted ? 'Posted' : 'Pending'}</div>
+    <button class="row-dup" title="Duplicate">⧉</button>
+    <button class="row-del" title="Delete">✕</button>
+  `;
+  row.querySelector('.post-toggle').addEventListener('change', (e) => togglePosted(item.id, e.target.checked));
+  row.querySelector('.row-del').addEventListener('click', () => deleteItem(item.id));
+  row.querySelector('.row-dup').addEventListener('click', () => openModal(null, item));
+  row.querySelector('.item-desc').addEventListener('click', () => openModal(item));
+  row.querySelector('.who-tag').addEventListener('click', () => openModal(item));
+  row.querySelector('.item-note').addEventListener('click', () => openModal(item));
+  row.querySelector('.item-tag-select').addEventListener('change', (e) => {
+    e.target.style.borderLeftColor = e.target.value ? getTagColorById(e.target.value) : 'var(--line)';
+    updateItemTag(item.id, e.target.value);
+  });
+  return row;
+}
+
+async function updateItemTag(id, tagId) {
+  const { error } = await sb.from('budget_items').update({ tag_id: tagId || null }).eq('id', id);
+  if (error) { alert('Could not update tag: ' + error.message); return; }
+  await loadItems();
+  render();
+}
+
+function renderList(mi) {
+  const wrap = $('listView');
+  wrap.innerHTML = '';
+
+  const toggleBar = document.createElement('div');
+  toggleBar.className = 'account-filter';
+  toggleBar.style.marginBottom = '16px';
+  toggleBar.innerHTML = `
+    <button class="acct-pill${listSortMode === 'category' ? ' active' : ''}" data-mode="category">By category</button>
+    <button class="acct-pill${listSortMode === 'date' ? ' active' : ''}" data-mode="date">By date</button>
+  `;
+  toggleBar.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', () => { listSortMode = btn.dataset.mode; renderList(mi); });
+  });
+  wrap.appendChild(toggleBar);
+
+  if (listSortMode === 'date') {
+    renderFlatDateList(wrap, mi);
+    return;
+  }
+
+  const dirBar = document.createElement('div');
+  dirBar.className = 'account-filter';
+  dirBar.style.marginBottom = '16px';
+  dirBar.innerHTML = `
+    <button class="acct-pill${categoryDateDir === 'desc' ? ' active' : ''}" data-dir="desc">Newest first</button>
+    <button class="acct-pill${categoryDateDir === 'asc' ? ' active' : ''}" data-dir="asc">Oldest first</button>
+  `;
+  dirBar.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', () => { categoryDateDir = btn.dataset.dir; renderList(mi); });
+  });
+  wrap.appendChild(dirBar);
+
+  const headerRow = document.createElement('div');
+  headerRow.className = 'item-row list-col-header';
+  headerRow.innerHTML = `<span></span><span>Item</span><span>Person</span><span>Note</span><span>Tag</span><span></span><span>Due</span><span></span><span></span><span></span>`;
+  wrap.appendChild(headerRow);
+
+  const ADD_BUTTON_CATEGORIES = CATEGORY_ORDER.filter(c => c !== 'transfer_out' && c !== 'transfer_in');
+
+  CATEGORY_ORDER.forEach(cat => {
+    const catItems = mi.filter(i => i.category === cat).sort((a,b) =>
+      categoryDateDir === 'asc' ? a.due_date.localeCompare(b.due_date) : b.due_date.localeCompare(a.due_date)
+    );
+    const total = catItems.reduce((s,i) => s + Number(i.amount), 0);
+    const showAddBtn = ADD_BUTTON_CATEGORIES.includes(cat);
+    const block = document.createElement('div');
+    block.className = 'section-block';
+    block.innerHTML = `
+      <div class="section-head">
+        <h3>${CATEGORY_LABELS[cat]}</h3>
+        <div style="display:flex;align-items:center;gap:14px;">
+          ${showAddBtn ? `<button type="button" class="add-section-btn" data-cat="${cat}">+ Add ${CATEGORY_LABELS[cat]}</button>` : ''}
+          <span class="sec-total">${fmtMoney(total)}</span>
+        </div>
+      </div>
+      <div class="section-rows"></div>
+    `;
+    if (showAddBtn) {
+      block.querySelector('.add-section-btn').addEventListener('click', () => openModalWithCategory(cat));
+    }
+    const rowsEl = block.querySelector('.section-rows');
+    if (catItems.length === 0) {
+      rowsEl.innerHTML = `<div class="empty-note">Nothing here yet.</div>`;
+    } else {
+      catItems.forEach(item => rowsEl.appendChild(buildItemRow(item, item.category)));
+    }
+    wrap.appendChild(block);
+  });
+}
+
+function renderFlatDateList(wrap, mi) {
+  const rangeBar = document.createElement('div');
+  rangeBar.className = 'account-filter';
+  rangeBar.style.marginBottom = '10px';
+  const RANGE_LABELS = { month: 'This month', last3: 'Last 3 months', last6: 'Last 6 months', last9: 'Last 9 months', last12: 'Last 12 months', custom: 'Custom range' };
+  rangeBar.innerHTML = Object.keys(RANGE_LABELS).map(key =>
+    `<button class="acct-pill${dateRangeMode === key ? ' active' : ''}" data-range="${key}">${RANGE_LABELS[key]}</button>`
+  ).join('');
+  rangeBar.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', () => { dateRangeMode = btn.dataset.range; renderList(mi); });
+  });
+  wrap.appendChild(rangeBar);
+
+  const dirBar = document.createElement('div');
+  dirBar.className = 'account-filter';
+  dirBar.style.marginBottom = '16px';
+  dirBar.innerHTML = `
+    <button class="acct-pill${flatDateDir === 'desc' ? ' active' : ''}" data-dir="desc">Newest first</button>
+    <button class="acct-pill${flatDateDir === 'asc' ? ' active' : ''}" data-dir="asc">Oldest first</button>
+  `;
+  dirBar.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', () => { flatDateDir = btn.dataset.dir; renderList(mi); });
+  });
+  wrap.appendChild(dirBar);
+
+  if (dateRangeMode === 'custom') {
+    const customBar = document.createElement('div');
+    customBar.style.cssText = 'display:flex;align-items:center;gap:10px;margin-bottom:14px;font-size:13px;color:var(--muted);flex-wrap:wrap;';
+    customBar.innerHTML = `
+      From <input type="date" id="customRangeStartInput" value="${customRangeStart}"
+             style="padding:6px 8px;border:1px solid var(--line);border-radius:4px;background:#fdfcf9;">
+      to <input type="date" id="customRangeEndInput" value="${customRangeEnd}"
+             style="padding:6px 8px;border:1px solid var(--line);border-radius:4px;background:#fdfcf9;">
+      <button class="btn btn-ghost" id="applyCustomRangeBtn" style="padding:6px 12px;font-size:13px;">Apply</button>
+    `;
+    wrap.appendChild(customBar);
+    customBar.querySelector('#applyCustomRangeBtn').addEventListener('click', () => {
+      customRangeStart = customBar.querySelector('#customRangeStartInput').value;
+      customRangeEnd = customBar.querySelector('#customRangeEndInput').value;
+      renderList(mi);
+    });
+  } else if (dateRangeMode !== 'month') {
+    const { start, end } = getRangeBounds();
+    const hint = document.createElement('div');
+    hint.style.cssText = 'font-size:12px;color:var(--muted);margin-bottom:14px;';
+    hint.textContent = `Showing ${start.toLocaleDateString(undefined,{month:'short',year:'numeric'})} – ${end.toLocaleDateString(undefined,{month:'short',year:'numeric'})}`;
+    wrap.appendChild(hint);
+  }
+
+  const flatItems = dateRangeMode === 'month' ? mi : getRangeFilteredItems();
+  const { start: rangeStart, end: rangeEnd } = getRangeBounds();
+
+  // A dated starting balance that falls inside the currently shown range
+  // appears as its own entry, so it factors into the running balance right
+  // where it belongs instead of only living in the summary tiles.
+  const relevantAccountsForBalance = currentAccountFilter === 'all' ? bankAccounts : bankAccounts.filter(a => a.id === currentAccountFilter);
+  const startingBalanceEntries = [];
+  relevantAccountsForBalance.forEach(a => {
+    const bal = Number(a.starting_balance || 0);
+    if (bal === 0 || !a.starting_balance_date) return;
+    const balDate = new Date(a.starting_balance_date + 'T00:00:00');
+    if (balDate < rangeStart || balDate > rangeEnd) return;
+    startingBalanceEntries.push({
+      id: 'sb-' + a.id,
+      isStartingBalance: true,
+      due_date: a.starting_balance_date,
+      amount: bal,
+      accountName: a.name
+    });
+  });
+  const combinedItems = [...flatItems, ...startingBalanceEntries];
+  function isEntryCredit(entry) { return entry.isStartingBalance ? entry.amount >= 0 : isCredit(entry.category); }
+
+  const headerRow = document.createElement('div');
+  headerRow.className = 'item-row item-row-flat list-col-header';
+  headerRow.innerHTML = `<span></span><span></span><span>Item</span><span>Category</span><span>Person</span><span>Note</span><span>Tag</span><span></span><span>Due</span><span></span><span></span><span></span>`;
+  wrap.appendChild(headerRow);
+
+  // Balance math always counts income before same-day bills (so a paycheck's
+  // "left" reflects income received, and a bill's "left" reflects it coming
+  // out of that) — unless you've dragged that date's rows into a manual
+  // order, in which case the balance follows your order too.
+  function compareChrono(a, b) {
+    if (a.due_date !== b.due_date) return a.due_date.localeCompare(b.due_date);
+    if (a.manual_order != null && b.manual_order != null) {
+      // Manual order is read the same direction the list is currently
+      // displayed in: in "Newest first" mode, the item closest to the
+      // bottom of its date cluster (nearest the older rows below it) is
+      // treated as happening earliest that day; in "Oldest first" mode
+      // that relationship flips, since the older neighbor is above instead.
+      return flatDateDir === 'asc' ? (a.manual_order - b.manual_order) : (b.manual_order - a.manual_order);
+    }
+    const aIncome = isEntryCredit(a) ? 0 : 1;
+    const bIncome = isEntryCredit(b) ? 0 : 1;
+    return aIncome - bIncome;
+  }
+
+  // Running balance is computed chronologically (oldest -> newest) so each
+  // item's number reflects what's left after everything up to that date,
+  // scoped to whatever range is currently selected.
+  const chronological = [...combinedItems].sort(compareChrono);
+  const balanceById = {};
+  let running = 0;
+  chronological.forEach(item => {
+    running += isEntryCredit(item) ? Number(item.amount) : -Number(item.amount);
+    balanceById[item.id] = running;
+  });
+
+  // Display order follows the Newest/Oldest toggle overall, but within a
+  // tied date, a manual drag order (if set) wins; otherwise bills sort
+  // above income (independent of direction).
+  function compareDisplay(a, b) {
+    if (a.due_date !== b.due_date) {
+      return flatDateDir === 'asc' ? a.due_date.localeCompare(b.due_date) : b.due_date.localeCompare(a.due_date);
+    }
+    if (a.manual_order != null && b.manual_order != null) return a.manual_order - b.manual_order;
+    const aIncome = isEntryCredit(a) ? 1 : 0;
+    const bIncome = isEntryCredit(b) ? 1 : 0;
+    return aIncome - bIncome; // bills first, income last
+  }
+  const sorted = [...combinedItems].sort(compareDisplay);
+  if (sorted.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'empty-note';
+    empty.textContent = 'Nothing in this range yet.';
+    wrap.appendChild(empty);
+    return;
+  }
+  let draggedId = null;
+  sorted.forEach(item => {
+    if (item.isStartingBalance) {
+      wrap.appendChild(buildStartingBalanceRow(item, balanceById[item.id]));
+      return;
+    }
+    const row = buildItemRow(item, item.category, balanceById[item.id]);
+    row.classList.add('item-row-flat');
+    row.dataset.itemId = item.id;
+    row.dataset.dueDate = item.due_date;
+    const catTag = document.createElement('span');
+    catTag.className = 'cat-tag';
+    catTag.textContent = CATEGORY_LABELS[item.category];
+    row.insertBefore(catTag, row.children[2]); // after item-desc, before who-tag
+
+    const handle = document.createElement('span');
+    handle.className = 'drag-handle';
+    handle.draggable = true;
+    handle.title = 'Drag to reorder within this date';
+    handle.textContent = '⠿';
+    row.insertBefore(handle, row.firstChild);
+
+    handle.addEventListener('dragstart', (e) => {
+      draggedId = item.id;
+      e.dataTransfer.effectAllowed = 'move';
+      row.classList.add('dragging');
+    });
+    handle.addEventListener('dragend', () => {
+      row.classList.remove('dragging');
+      wrap.querySelectorAll('.item-row-flat').forEach(r => r.classList.remove('drag-over-top', 'drag-over-bottom'));
+    });
+    row.addEventListener('dragover', (e) => {
+      if (!draggedId || draggedId === item.id) return;
+      e.preventDefault();
+      const rect = row.getBoundingClientRect();
+      const before = (e.clientY - rect.top) < rect.height / 2;
+      row.classList.toggle('drag-over-top', before);
+      row.classList.toggle('drag-over-bottom', !before);
+    });
+    row.addEventListener('dragleave', () => {
+      row.classList.remove('drag-over-top', 'drag-over-bottom');
+    });
+    row.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      const wasBefore = row.classList.contains('drag-over-top');
+      row.classList.remove('drag-over-top', 'drag-over-bottom');
+      if (!draggedId || draggedId === item.id) return;
+      if (typeof draggedId === 'string' && draggedId.startsWith('sb-')) return; // can't drag a starting balance entry
+      await reorderWithinDate(draggedId, item.id, wasBefore ? 'before' : 'after', sorted.filter(i => !i.isStartingBalance));
+      draggedId = null;
+    });
+
+    wrap.appendChild(row);
+  });
+}
+
+function buildStartingBalanceRow(entry, runningBalance) {
+  const row = document.createElement('div');
+  row.className = 'item-row item-row-flat sb-row';
+  const d = new Date(entry.due_date + 'T00:00:00');
+  const positive = entry.amount >= 0;
+  row.innerHTML = `
+    <span></span>
+    <span></span>
+    <div class="item-desc">Starting balance
+      <span class="cat-note">${escapeHtml(entry.accountName)}</span>
+    </div>
+    <span class="cat-tag" style="background:var(--gold);">Starting Balance</span>
+    <span></span>
+    <span></span>
+    <span></span>
+    <div class="item-amt-wrap">
+      <div class="item-amt ${positive ? 'income' : ''}">${positive ? '+' : '-'}${fmtMoney(Math.abs(entry.amount))}</div>
+      ${runningBalance !== undefined ? `<div class="item-balance${runningBalance < 0 ? ' negative' : ''}">${fmtMoney(runningBalance)} left</div>` : ''}
+    </div>
+    <div class="item-due">${d.toLocaleDateString(undefined,{month:'short',day:'numeric'})}</div>
+    <span></span>
+    <span></span>
+    <span></span>
+  `;
+  return row;
+}
+
+async function reorderWithinDate(draggedId, targetId, position, currentSorted) {
+  const draggedItem = items.find(i => i.id === draggedId);
+  const targetItem = items.find(i => i.id === targetId);
+  if (!draggedItem || !targetItem) return;
+  if (draggedItem.due_date !== targetItem.due_date) {
+    alert('Records can only be reordered against other records on the same date.');
+    return;
+  }
+  const dateGroup = currentSorted.filter(i => i.due_date === draggedItem.due_date);
+  const withoutDragged = dateGroup.filter(i => i.id !== draggedId);
+  const targetIdx = withoutDragged.findIndex(i => i.id === targetId);
+  const insertIdx = position === 'before' ? targetIdx : targetIdx + 1;
+  withoutDragged.splice(insertIdx, 0, draggedItem);
+
+  try {
+    const results = await Promise.all(withoutDragged.map((item, idx) =>
+      sb.from('budget_items').update({ manual_order: (idx + 1) * 10 }).eq('id', item.id)
+    ));
+    const firstError = results.find(r => r.error);
+    if (firstError) throw firstError.error;
+    await loadItems();
+    render();
+  } catch (err) {
+    alert('Could not save the new order: ' + (err.message || err));
+  }
+}
+
+// ---------------- REPORTS ----------------
+let reportRangeMode = 'month'; // month | last3 | last6 | last9 | last12 | last24 | thisYear | lastYear | custom
+let reportCustomStart = '';
+let reportCustomEnd = '';
+let reportSelectedAccounts = new Set(); // account ids, plus 'unassigned'
+let reportSelectedTags = new Set(); // tag ids, plus 'none'
+let reportSelectedPersons = new Set();
+let reportSelectedCategories = new Set();
+let reportPieDims = ['tag', 'category', 'person']; // customizable per panel
+let reportPieCounts = [5, 5, 5]; // 5 | 10 | 'all', per panel
+let reportPieTypeFilters = [null, null, null]; // Set of category keys per panel, or null = no extra restriction beyond the global Type filter
+let reportFiltersInitialized = false;
+
+function initReportFiltersIfNeeded() {
+  // Seed "everything selected" the first time Reports is opened. On later
+  // visits, just add any brand-new accounts/tags/persons so they're not
+  // silently excluded — existing selections (including manual deselections)
+  // are left alone.
+  const accountKeys = [...bankAccounts.map(a => a.id), 'unassigned'];
+  const tagKeys = [...tags.map(t => t.id), 'none'];
+  const personKeys = [...new Set(items.map(i => i.person).filter(Boolean))];
+  const categoryKeys = [...CATEGORY_ORDER];
+
+  if (!reportFiltersInitialized) {
+    reportSelectedAccounts = new Set(accountKeys);
+    reportSelectedTags = new Set(tagKeys);
+    reportSelectedPersons = new Set(personKeys);
+    reportSelectedCategories = new Set(categoryKeys);
+    reportFiltersInitialized = true;
+  }
+}
+
+function getReportRangeBounds() {
+  const now = new Date();
+  const monthStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+  const monthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+  if (reportRangeMode === 'month') return { start: monthStart, end: monthEnd };
+  if (reportRangeMode === 'thisYear') return { start: new Date(now.getFullYear(), 0, 1), end: new Date(now.getFullYear(), 11, 31) };
+  if (reportRangeMode === 'lastYear') return { start: new Date(now.getFullYear() - 1, 0, 1), end: new Date(now.getFullYear() - 1, 11, 31) };
+  if (reportRangeMode === 'custom') {
+    const start = reportCustomStart ? new Date(reportCustomStart + 'T00:00:00') : monthStart;
+    const end = reportCustomEnd ? new Date(reportCustomEnd + 'T00:00:00') : monthEnd;
+    return { start, end };
+  }
+  const monthsBack = { last3: 3, last6: 6, last9: 9, last12: 12, last24: 24 }[reportRangeMode] || 1;
+  const start = new Date(monthEnd.getFullYear(), monthEnd.getMonth() - (monthsBack - 1), 1);
+  return { start, end: monthEnd };
+}
+
+function getFilteredReportItems() {
+  const { start, end } = getReportRangeBounds();
+  return items.filter(i => {
+    const d = new Date(i.due_date + 'T00:00:00');
+    if (d < start || d > end) return false;
+    if (!reportSelectedAccounts.has(i.account_id || 'unassigned')) return false;
+    if (!reportSelectedTags.has(i.tag_id || 'none')) return false;
+    if (!reportSelectedPersons.has(i.person)) return false;
+    if (!reportSelectedCategories.has(i.category)) return false;
+    return true;
+  });
+}
+
+function renderReports() {
+  renderReportFilters();
+  const filtered = getFilteredReportItems();
+  renderReportSummary(filtered);
+  renderReportCharts(filtered);
+  renderReportTable(filtered);
+}
+
+function reportCheckboxGroup(title, groupKey, options, selectedSet) {
+  const wrap = document.createElement('div');
+  wrap.className = 'report-filter-group';
+  const head = document.createElement('div');
+  head.className = 'rfg-head';
+  head.innerHTML = `<span class="rfg-title">${escapeHtml(title)}</span>`;
+  const toggleBtn = document.createElement('button');
+  toggleBtn.type = 'button';
+  toggleBtn.className = 'rfg-toggle';
+  toggleBtn.textContent = 'All / None';
+  toggleBtn.addEventListener('click', () => {
+    const allSelected = options.every(o => selectedSet.has(o.key));
+    if (allSelected) selectedSet.clear();
+    else options.forEach(o => selectedSet.add(o.key));
+    renderReports();
+  });
+  head.appendChild(toggleBtn);
+  wrap.appendChild(head);
+  const optsWrap = document.createElement('div');
+  optsWrap.className = 'rfg-options';
+  options.forEach(o => {
+    const label = document.createElement('label');
+    label.innerHTML = `<input type="checkbox" data-rfg="${groupKey}" data-key="${escapeHtml(o.key)}" ${selectedSet.has(o.key) ? 'checked' : ''}> ${escapeHtml(o.label)}`;
+    label.querySelector('input').addEventListener('change', (e) => {
+      if (e.target.checked) selectedSet.add(o.key); else selectedSet.delete(o.key);
+      renderReports();
+    });
+    optsWrap.appendChild(label);
+  });
+  wrap.appendChild(optsWrap);
+  return wrap;
+}
+
+function renderReportFilters() {
+  const wrap = $('reportFilters');
+  wrap.innerHTML = '';
+
+  const row = document.createElement('div');
+  row.className = 'report-filter-row';
+
+  const accountOptions = [...bankAccounts.map(a => ({ key: a.id, label: a.name })), { key: 'unassigned', label: 'Unassigned' }];
+  const tagOptions = [...tags.map(t => ({ key: t.id, label: t.name })), { key: 'none', label: 'No tag' }];
+  const personOptions = [...new Set(items.map(i => i.person).filter(Boolean))].sort().map(p => ({ key: p, label: p }));
+  const categoryOptions = CATEGORY_ORDER.map(c => ({ key: c, label: CATEGORY_LABELS[c] }));
+
+  row.appendChild(reportCheckboxGroup('Accounts', 'account', accountOptions, reportSelectedAccounts));
+  row.appendChild(reportCheckboxGroup('Tags', 'tag', tagOptions, reportSelectedTags));
+  row.appendChild(reportCheckboxGroup('Person', 'person', personOptions, reportSelectedPersons));
+  row.appendChild(reportCheckboxGroup('Type', 'category', categoryOptions, reportSelectedCategories));
+  wrap.appendChild(row);
+
+  const rangeRow = document.createElement('div');
+  rangeRow.style.cssText = 'display:flex;align-items:center;gap:10px;flex-wrap:wrap;';
+  const RANGE_LABELS = { month: 'This month', last3: 'Last 3 mo', last6: 'Last 6 mo', last9: 'Last 9 mo', last12: 'Last 12 mo', last24: 'Last 24 mo', thisYear: 'This year', lastYear: 'Last year', custom: 'Custom' };
+  const pillsWrap = document.createElement('div');
+  pillsWrap.className = 'account-filter';
+  pillsWrap.innerHTML = Object.keys(RANGE_LABELS).map(key =>
+    `<button type="button" class="acct-pill${reportRangeMode === key ? ' active' : ''}" data-range="${key}">${RANGE_LABELS[key]}</button>`
+  ).join('');
+  pillsWrap.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', () => { reportRangeMode = btn.dataset.range; renderReports(); });
+  });
+  rangeRow.appendChild(pillsWrap);
+
+  const exportBtn = document.createElement('button');
+  exportBtn.type = 'button';
+  exportBtn.className = 'btn btn-primary report-export-btn';
+  exportBtn.style.width = 'auto';
+  exportBtn.textContent = '⬇ Export CSV';
+  exportBtn.addEventListener('click', exportReportCSV);
+  rangeRow.appendChild(exportBtn);
+  wrap.appendChild(rangeRow);
+
+  if (reportRangeMode === 'custom') {
+    const customBar = document.createElement('div');
+    customBar.style.cssText = 'display:flex;align-items:center;gap:10px;margin-top:12px;font-size:13px;color:var(--muted);flex-wrap:wrap;';
+    customBar.innerHTML = `
+      From <input type="date" id="reportCustomStartInput" value="${reportCustomStart}"
+             style="padding:6px 8px;border:1px solid var(--line);border-radius:4px;background:#fdfcf9;">
+      to <input type="date" id="reportCustomEndInput" value="${reportCustomEnd}"
+             style="padding:6px 8px;border:1px solid var(--line);border-radius:4px;background:#fdfcf9;">
+      <button type="button" class="btn btn-ghost" id="applyReportRangeBtn" style="padding:6px 12px;font-size:13px;">Apply</button>
+      <span style="font-size:11px;">Reports can look back up to 2 years.</span>
+    `;
+    wrap.appendChild(customBar);
+    customBar.querySelector('#applyReportRangeBtn').addEventListener('click', () => {
+      reportCustomStart = customBar.querySelector('#reportCustomStartInput').value;
+      reportCustomEnd = customBar.querySelector('#reportCustomEndInput').value;
+      renderReports();
+    });
+  }
+}
+
+function renderReportSummary(filtered) {
+  const income = filtered.filter(i => i.category === 'income').reduce((s,i) => s + Number(i.amount), 0);
+  const out = filtered.filter(i => i.category !== 'income' && i.category !== 'transfer_in' && i.category !== 'transfer_out')
+    .reduce((s,i) => s + Number(i.amount), 0);
+  const net = filtered.reduce((s,i) => s + (isCredit(i.category) ? Number(i.amount) : -Number(i.amount)), 0);
+  const wrap = $('reportSummaryRow');
+  wrap.innerHTML = `
+    <div class="sum-card pos"><div class="lbl">Total income</div><div class="val">${fmtMoney(income)}</div></div>
+    <div class="sum-card neg"><div class="lbl">Total spent</div><div class="val">${fmtMoney(out)}</div></div>
+    <div class="sum-card ${net >= 0 ? 'pos' : 'neg'}"><div class="lbl">Net</div><div class="val">${fmtMoney(net)}</div></div>
+    <div class="sum-card"><div class="lbl">Transactions</div><div class="val">${filtered.length}</div></div>
+  `;
+}
+
+const PIE_COLORS = ['#1f3a34', '#b8935f', '#a8452f', '#345048', '#e4d3b6', '#6b6558'];
+
+function getSliceColor(idx) {
+  if (idx < PIE_COLORS.length) return PIE_COLORS[idx];
+  // Beyond the fixed palette (for "Top 10" / "All"), generate more distinct
+  // hues procedurally rather than repeating colors.
+  const hue = (idx * 47) % 360;
+  return `hsl(${hue}, 42%, 42%)`;
+}
+
+function getDimensionLabel(item, dim) {
+  if (dim === 'tag') return getTagName(item) || 'No tag';
+  if (dim === 'person') return item.person || 'Unknown';
+  if (dim === 'category') return CATEGORY_LABELS[item.category] || item.category;
+  return 'Unknown';
+}
+
+function topNBreakdown(filtered, dim, panelIdx) {
+  const typeFilter = reportPieTypeFilters[panelIdx];
+  const scoped = typeFilter ? filtered.filter(i => typeFilter.has(i.category)) : filtered;
+  const totals = {};
+  scoped.forEach(i => {
+    const label = getDimensionLabel(i, dim);
+    totals[label] = (totals[label] || 0) + Math.abs(Number(i.amount));
+  });
+  const sorted = Object.entries(totals).sort((a,b) => b[1] - a[1]);
+  const count = reportPieCounts[panelIdx];
+  if (count === 'all') return sorted.map(([label, value]) => ({ label, value }));
+  const top = sorted.slice(0, count);
+  const rest = sorted.slice(count).reduce((s,[,v]) => s + v, 0);
+  if (rest > 0) top.push(['Other', rest]);
+  return top.map(([label, value]) => ({ label, value }));
+}
+
+function buildPieSVG(data) {
+  const total = data.reduce((s,d) => s + d.value, 0);
+  if (total === 0) return '<div class="empty-note">No data for this selection.</div>';
+  const cx = 90, cy = 90, r = 80;
+  let angle = -90;
+  const paths = data.map((d, idx) => {
+    const slice = (d.value / total) * 360;
+    const startX = cx + r * Math.cos(angle * Math.PI / 180);
+    const startY = cy + r * Math.sin(angle * Math.PI / 180);
+    angle += slice;
+    const endX = cx + r * Math.cos(angle * Math.PI / 180);
+    const endY = cy + r * Math.sin(angle * Math.PI / 180);
+    const largeArc = slice > 180 ? 1 : 0;
+    const color = getSliceColor(idx);
+    return `<path d="M${cx},${cy} L${startX.toFixed(2)},${startY.toFixed(2)} A${r},${r} 0 ${largeArc} 1 ${endX.toFixed(2)},${endY.toFixed(2)} Z" fill="${color}"><title>${escapeHtml(d.label)}: ${fmtMoney(d.value)}</title></path>`;
+  }).join('');
+  return `<svg viewBox="0 0 180 180" style="width:100%;max-width:180px;display:block;margin:0 auto;">${paths}</svg>`;
+}
+
+function buildPieLegend(data) {
+  const total = data.reduce((s,d) => s + d.value, 0);
+  return `<div class="chart-legend">${data.map((d, idx) => `
+    <div class="chart-legend-row">
+      <span class="chart-legend-swatch" style="background:${getSliceColor(idx)}"></span>
+      <span class="chart-legend-label">${escapeHtml(d.label)}</span>
+      <span class="chart-legend-val">${total > 0 ? Math.round((d.value/total)*100) : 0}%</span>
+    </div>
+  `).join('')}</div>`;
+}
+
+function monthKey(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+
+function buildMonthlyBarSVG(filtered) {
+  const { start, end } = getReportRangeBounds();
+  const months = [];
+  const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
+  while (cursor <= end) {
+    months.push(`${cursor.getFullYear()}-${String(cursor.getMonth()+1).padStart(2,'0')}`);
+    cursor.setMonth(cursor.getMonth() + 1);
+  }
+  const incomeByMonth = {}, outByMonth = {};
+  months.forEach(m => { incomeByMonth[m] = 0; outByMonth[m] = 0; });
+  filtered.forEach(i => {
+    const key = monthKey(i.due_date);
+    if (!(key in incomeByMonth)) return;
+    if (i.category === 'income') incomeByMonth[key] += Number(i.amount);
+    else if (i.category !== 'transfer_in' && i.category !== 'transfer_out') outByMonth[key] += Number(i.amount);
+  });
+  const maxVal = Math.max(1, ...months.map(m => Math.max(incomeByMonth[m], outByMonth[m])));
+  const chartW = Math.max(320, months.length * 60);
+  const chartH = 160;
+  const barW = 18;
+  let bars = '';
+  months.forEach((m, idx) => {
+    const groupX = idx * 60 + 20;
+    const incH = (incomeByMonth[m] / maxVal) * (chartH - 30);
+    const outH = (outByMonth[m] / maxVal) * (chartH - 30);
+    bars += `<rect x="${groupX}" y="${chartH - 20 - incH}" width="${barW}" height="${incH}" fill="var(--green-pos, #2f6b4f)"><title>${m} income: ${fmtMoney(incomeByMonth[m])}</title></rect>`;
+    bars += `<rect x="${groupX + barW + 4}" y="${chartH - 20 - outH}" width="${barW}" height="${outH}" fill="#a8452f"><title>${m} spent: ${fmtMoney(outByMonth[m])}</title></rect>`;
+    const [y, mo] = m.split('-');
+    bars += `<text x="${groupX + barW}" y="${chartH - 4}" font-size="9" text-anchor="middle" fill="#6b6558">${mo}/${y.slice(2)}</text>`;
+  });
+  return `<div style="overflow-x:auto;"><svg viewBox="0 0 ${chartW} ${chartH}" style="width:100%;min-width:${chartW}px;height:${chartH}px;">${bars}</svg></div>
+    <div style="display:flex;gap:16px;font-size:12px;margin-top:6px;">
+      <span><span style="display:inline-block;width:10px;height:10px;background:#2f6b4f;border-radius:2px;margin-right:5px;"></span>Income</span>
+      <span><span style="display:inline-block;width:10px;height:10px;background:#a8452f;border-radius:2px;margin-right:5px;"></span>Spent</span>
+    </div>`;
+}
+
+function renderReportCharts(filtered) {
+  const wrap = $('reportCharts');
+  wrap.innerHTML = '';
+  const dimLabels = { tag: 'Tag', category: 'Type', person: 'Person' };
+
+  reportPieDims.forEach((dim, panelIdx) => {
+    const data = topNBreakdown(filtered, dim, panelIdx);
+    const countLabel = reportPieCounts[panelIdx] === 'all' ? 'All' : `Top ${reportPieCounts[panelIdx]}`;
+    const typeFilter = reportPieTypeFilters[panelIdx];
+    const typeFilterActive = typeFilter && typeFilter.size < CATEGORY_ORDER.length;
+
+    const panel = document.createElement('div');
+    panel.className = 'chart-panel';
+    panel.innerHTML = `
+      <div class="chart-head">
+        <h4>${countLabel} by ${dimLabels[dim]}</h4>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
+        <select class="pie-dim-select">
+          <option value="tag" ${dim === 'tag' ? 'selected' : ''}>Tag</option>
+          <option value="category" ${dim === 'category' ? 'selected' : ''}>Type</option>
+          <option value="person" ${dim === 'person' ? 'selected' : ''}>Person</option>
+        </select>
+        <select class="pie-count-select">
+          <option value="5" ${reportPieCounts[panelIdx] === 5 ? 'selected' : ''}>Top 5</option>
+          <option value="10" ${reportPieCounts[panelIdx] === 10 ? 'selected' : ''}>Top 10</option>
+          <option value="all" ${reportPieCounts[panelIdx] === 'all' ? 'selected' : ''}>All</option>
+        </select>
+        <details class="pie-type-filter">
+          <summary>Types${typeFilterActive ? ' •' : ''}</summary>
+          <div class="pie-type-filter-options"></div>
+        </details>
+      </div>
+      ${buildPieSVG(data)}
+      ${buildPieLegend(data)}
+    `;
+    panel.querySelector('.pie-dim-select').addEventListener('change', (e) => {
+      reportPieDims[panelIdx] = e.target.value;
+      renderReportCharts(filtered);
+    });
+    panel.querySelector('.pie-count-select').addEventListener('change', (e) => {
+      reportPieCounts[panelIdx] = e.target.value === 'all' ? 'all' : parseInt(e.target.value, 10);
+      renderReportCharts(filtered);
+    });
+    const typeOptsWrap = panel.querySelector('.pie-type-filter-options');
+    const currentTypeSet = typeFilter || new Set(CATEGORY_ORDER);
+    CATEGORY_ORDER.forEach(cat => {
+      const label = document.createElement('label');
+      label.innerHTML = `<input type="checkbox" ${currentTypeSet.has(cat) ? 'checked' : ''}> ${escapeHtml(CATEGORY_LABELS[cat])}`;
+      label.querySelector('input').addEventListener('change', (e) => {
+        const active = reportPieTypeFilters[panelIdx] ? new Set(reportPieTypeFilters[panelIdx]) : new Set(CATEGORY_ORDER);
+        if (e.target.checked) active.add(cat); else active.delete(cat);
+        reportPieTypeFilters[panelIdx] = active.size < CATEGORY_ORDER.length ? active : null;
+        renderReportCharts(filtered);
+      });
+      typeOptsWrap.appendChild(label);
+    });
+    wrap.appendChild(panel);
+  });
+
+  const barPanel = document.createElement('div');
+  barPanel.className = 'chart-panel';
+  barPanel.innerHTML = `<div class="chart-head"><h4>Income vs. spent by month</h4></div>${buildMonthlyBarSVG(filtered)}`;
+  wrap.appendChild(barPanel);
+}
+
+function renderReportTable(filtered) {
+  const wrap = $('reportTable');
+  $('reportRowCount').textContent = `${filtered.length} transaction${filtered.length === 1 ? '' : 's'}`;
+  wrap.innerHTML = '';
+  const sorted = [...filtered].sort((a,b) => b.due_date.localeCompare(a.due_date));
+  const cap = 500;
+  const toShow = sorted.slice(0, cap);
+  if (toShow.length === 0) {
+    wrap.innerHTML = '<div class="empty-note">No transactions match these filters.</div>';
+    return;
+  }
+  const header = document.createElement('div');
+  header.className = 'report-table-row list-col-header';
+  header.innerHTML = `<span>Due</span><span>Item</span><span>Type</span><span>Person</span><span>Tag</span><span>Amount</span>`;
+  wrap.appendChild(header);
+  toShow.forEach(item => {
+    const row = document.createElement('div');
+    row.className = 'report-table-row';
+    const dueDate = new Date(item.due_date + 'T00:00:00');
+    row.innerHTML = `
+      <span>${dueDate.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'2-digit'})}</span>
+      <span>${escapeHtml(item.description || CATEGORY_LABELS[item.category])} <span style="color:var(--muted);font-size:11px;">· ${escapeHtml(getAccountName(item))}</span></span>
+      <span>${escapeHtml(CATEGORY_LABELS[item.category])}</span>
+      <span>${escapeHtml(item.person)}</span>
+      <span>${escapeHtml(getTagName(item) || '—')}</span>
+      <span class="rt-amt ${isCredit(item.category) ? 'income' : ''}">${isCredit(item.category) ? '+' : '-'}${fmtMoney(Math.abs(item.amount))}</span>
+    `;
+    wrap.appendChild(row);
+  });
+  if (sorted.length > cap) {
+    const note = document.createElement('div');
+    note.className = 'empty-note';
+    note.textContent = `Showing the most recent ${cap} of ${sorted.length} matching transactions — narrow your filters to see the rest, or export to CSV for the full set.`;
+    wrap.appendChild(note);
+  }
+}
+
+function csvEscape(val) {
+  const s = String(val ?? '');
+  if (/[",\n]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+  return s;
+}
+
+function exportReportCSV() {
+  const filtered = getFilteredReportItems();
+  const sorted = [...filtered].sort((a,b) => a.due_date.localeCompare(b.due_date));
+  const headers = ['Date', 'Type', 'Person', 'Account', 'Tag', 'Description', 'Note', 'Amount', 'Posted'];
+  const rows = sorted.map(item => [
+    item.due_date,
+    CATEGORY_LABELS[item.category] || item.category,
+    item.person,
+    getAccountName(item),
+    getTagName(item) || '',
+    item.description || '',
+    item.notes || '',
+    (isCredit(item.category) ? '' : '-') + Math.abs(Number(item.amount)).toFixed(2),
+    item.posted ? 'Yes' : 'No'
+  ]);
+  const csv = [headers, ...rows].map(r => r.map(csvEscape).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const { start, end } = getReportRangeBounds();
+  const fmtFileDate = (d) => d.toISOString().slice(0,10);
+  a.href = url;
+  a.download = `budget-report_${fmtFileDate(start)}_to_${fmtFileDate(end)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function renderCalendar(mi) {
+  const grid = $('calGrid');
+  grid.innerHTML = '';
+  const y = currentDate.getFullYear(), m = currentDate.getMonth();
+  const firstDay = new Date(y, m, 1).getDay();
+  const daysInMonth = new Date(y, m + 1, 0).getDate();
+  const today = new Date();
+  const carryover = getPriorMonthsTotal();
+
+  const carryEl = $('calCarryoverNote');
+  if (carryEl) {
+    carryEl.textContent = `Carried in from before this month: ${fmtMoney(carryover)}`;
+    carryEl.className = 'cal-carryover-note' + (carryover < 0 ? ' negative' : '');
+  }
+
+  ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach(d => {
+    const el = document.createElement('div');
+    el.className = 'cal-dow';
+    el.textContent = d;
+    grid.appendChild(el);
+  });
+
+  for (let i = 0; i < firstDay; i++) {
+    const blank = document.createElement('div');
+    blank.className = 'cal-cell blank';
+    grid.appendChild(blank);
+  }
+
+  let cumulativeIncome = 0;
+  let cumulativeOut = 0;
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dateStr = new Date(y, m, day).toISOString().slice(0,10);
+    const dayItems = mi.filter(i => i.due_date === dateStr).sort((a,b) => isCredit(a.category) ? -1 : 1);
+    const dayIncome = dayItems.filter(i => isCredit(i.category)).reduce((s,i) => s + Number(i.amount), 0);
+    const dayOut = dayItems.filter(i => !isCredit(i.category)).reduce((s,i) => s + Number(i.amount), 0);
+    cumulativeIncome += dayIncome;
+    cumulativeOut += dayOut;
+    const remaining = carryover + cumulativeIncome - cumulativeOut;
+
+    const cell = document.createElement('div');
+    cell.className = 'cal-cell';
+    const isToday = today.getFullYear() === y && today.getMonth() === m && today.getDate() === day;
+
+    const dayNum = document.createElement('div');
+    dayNum.className = 'cal-daynum' + (isToday ? ' today' : '');
+    dayNum.textContent = day;
+    cell.appendChild(dayNum);
+
+    if (dayOut > 0) {
+      const outEl = document.createElement('div');
+      outEl.className = 'cal-out';
+      outEl.textContent = '-' + fmtMoney(dayOut);
+      cell.appendChild(outEl);
+    }
+
+    if (dayItems.length > 0) {
+      const itemsWrap = document.createElement('div');
+      itemsWrap.className = 'cal-items';
+      dayItems.forEach(item => {
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'cal-item-chip' + (isCredit(item.category) ? ' income' : '') + (item.posted ? ' posted' : '');
+        const label = item.description || CATEGORY_LABELS[item.category];
+        chip.textContent = `${item.person}: ${label}`;
+        chip.title = `${label} — ${item.person} — ${fmtMoney(item.amount)}${item.posted ? ' (posted)' : ''}`;
+        chip.addEventListener('click', () => openModal(item));
+        itemsWrap.appendChild(chip);
+      });
+      cell.appendChild(itemsWrap);
+    }
+
+    const leftEl = document.createElement('div');
+    leftEl.className = 'cal-left';
+    leftEl.innerHTML = `left: <b>${fmtMoney(remaining)}</b>`;
+    cell.appendChild(leftEl);
+
+    grid.appendChild(cell);
+  }
+}
+</script>
+</body>
+</html>
